@@ -364,8 +364,13 @@ public static class MapKit
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
         var tmp = go.AddComponent<TextMeshPro>();
-        tmp.rectTransform.sizeDelta = rect;
-        go.transform.localPosition = pos;
+        var rt = tmp.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = rect;
+        // У RectTransform в сцену сохраняется anchoredPosition, а не localPosition: если задать только
+        // localPosition, после перезагрузки сцены X/Y сбрасываются в 0 и надписи «падают» на пол.
+        rt.anchoredPosition3D = pos;
+        rt.localPosition = pos;
         go.transform.localRotation = rot;
         tmp.font = Font;
         tmp.text = text;
