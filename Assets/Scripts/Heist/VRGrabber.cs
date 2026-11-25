@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -23,7 +23,8 @@ public class VRGrabber : MonoBehaviour
     public float throwSpeed = 9f;
 
     [Header("VR-рука")]
-    public float handGrabRadius = 0.15f;
+    [Tooltip("Радиус «магнитного» хвата рукой (0.15 → 0.195, +30%)")]
+    public float handGrabRadius = 0.195f;
     [Tooltip("Откуда брать поворот предмета (обычно сам контроллер). Пусто = этот объект.")]
     public Transform rotationReference;
     [Tooltip("Пока предмет в руке, он переносится на этот слой, чтобы Gorilla-руки не отталкивались от него")]

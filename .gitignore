@@ -112,3 +112,16 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Secrets (API keys) - never commit
+.env
+.env.*
+!.env.example
+
+# Tripo browser-helper login profile (cookies) - never commit
+tools/.tripo_browser_profile/
+
+# Python cache
+__pycache__/
+*.pyc
+

@@ -32,13 +32,20 @@ public class AlarmSystem : MonoBehaviour
     {
         Instance = this;
         siren = GetComponent<AudioSource>();
-        siren.clip = ProceduralAudio.Siren();
+        siren.clip = ProceduralAudio.AlarmBeep(); // короткие «пи… пи…» вместо непрерывного воя
         siren.loop = true;
         siren.playOnAwake = false;
         siren.spatialBlend = 0f;
-        siren.volume = 0.35f;
+        siren.volume = sirenVolume;
         SetLights(0f);
     }
+
+    [Header("Звук")]
+    [Tooltip("Громкость писка тревоги (раньше было 0.35 непрерывной сиреной)")]
+    public float sirenVolume = 0.2f;
+    [Tooltip("Сколько секунд пищит после начала тревоги (свет мигает всё время тревоги)")]
+    public float beepDuration = 5f;
+    float activeSince = -1f;
 
     void OnDestroy() { if (Instance == this) Instance = null; }
 
@@ -60,8 +67,12 @@ public class AlarmSystem : MonoBehaviour
     void Update()
     {
         bool active = IsActive;
-        if (active && !siren.isPlaying) siren.Play();
-        else if (!active && siren.isPlaying) siren.Stop();
+        if (active && activeSince < 0f) activeSince = Time.time;
+        if (!active) activeSince = -1f;
+        bool beeping = active && Time.time - activeSince < beepDuration;
+        siren.volume = sirenVolume;
+        if (beeping && !siren.isPlaying) siren.Play();
+        else if (!beeping && siren.isPlaying) siren.Stop();
         SetLights(active ? (0.5f + 0.5f * Mathf.Sin(Time.time * 9f)) : 0f);
     }
 

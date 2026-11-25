@@ -233,7 +233,7 @@ public static class HeistVRPlayerSetup
         gp.maxArmLength = 1.5f;
         gp.unStickDistance = 1f;
         gp.velocityLimit = 0.3f;
-        gp.maxJumpSpeed = 6.5f;
+        gp.maxJumpSpeed = 7.5f;
         gp.jumpMultiplier = 1.1f;
         gp.minimumRaycastDistance = 0.05f;
         gp.defaultSlideFactor = 0.03f;
@@ -289,7 +289,7 @@ public static class HeistVRPlayerSetup
         var g = hand.AddComponent<VRGrabber>();
         g.input = input;
         g.rotationReference = controller;
-        g.handGrabRadius = 0.15f;
+        g.handGrabRadius = 0.195f;
     }
 
     // ------------------------------------------------------------ scene
