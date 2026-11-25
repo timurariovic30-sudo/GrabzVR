@@ -47,6 +47,9 @@ public class PlayerModeSwitcher : MonoBehaviour
 
     void Update()
     {
+        // Шлем поднялся позже (Quest Link / AirLink бывает и через 5–10 с) → сразу в VR,
+        // иначе в шлеме оставалась бы десктопная камера с экранным текстом
+        if (startMode == Mode.Auto && Current != Mode.VR && XRSettings.isDeviceActive) { Apply(Mode.VR); return; }
         var kb = Keyboard.current;
         if (kb == null || Current == Mode.VR) return;
         if (kb[toggleKey].wasPressedThisFrame)
@@ -117,7 +120,7 @@ public class PlayerModeSwitcher : MonoBehaviour
 
     void OnGUI()
     {
-        if (Current == Mode.VR) return;
+        if (Current == Mode.VR || XRSettings.isDeviceActive) return; // в шлеме — только World Space
         string text = Current == Mode.Desktop
             ? "Режим: DESKTOP   •   F1 — VR-руки с клавиатуры (симулятор)"
             : "Режим: VR-СИМУЛЯТОР   •   F1 — обратно в Desktop";

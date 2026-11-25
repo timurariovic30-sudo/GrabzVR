@@ -12,6 +12,8 @@ public class PlayerSkinController : MonoBehaviour
 
     [Tooltip("Рендеры с материалом шерсти (тело и голова модели)")]
     public Renderer[] furRenderers;
+    [Tooltip("Если задан — перекрашиваются только слоты с этим материалом (серый живот и морда остаются как есть)")]
+    public Material furMaterial;
     public Color furColor = new Color(0.17f, 0.17f, 0.19f);
     [Tooltip("Загружать сохранённый цвет из PlayerPrefs при старте")]
     public bool loadSavedColor = true;
@@ -77,9 +79,22 @@ public class PlayerSkinController : MonoBehaviour
         foreach (var r in furRenderers)
         {
             if (r == null) continue;
-            r.GetPropertyBlock(block);
-            block.SetColor(BaseColorId, furColor);
-            r.SetPropertyBlock(block);
+            if (furMaterial == null)
+            {
+                r.GetPropertyBlock(block);
+                block.SetColor(BaseColorId, furColor);
+                r.SetPropertyBlock(block);
+                continue;
+            }
+            // Модель с несколькими материалами (шерсть + живот/морда): красим только слоты шерсти
+            var mats = r.sharedMaterials;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] != furMaterial) continue;
+                r.GetPropertyBlock(block, i);
+                block.SetColor(BaseColorId, furColor);
+                r.SetPropertyBlock(block, i);
+            }
         }
     }
 }

@@ -23,6 +23,11 @@ public class TripoAssetPostprocessor : AssetPostprocessor
 
     static bool InFolder(string path) => path.Replace('\\', '/').StartsWith(Folder + "/");
 
+    /// Модель игрока (Gorilla_Final) собирается отдельным билдером: текстура 512 px (атлас мелко
+    /// нарезан — на 128 px шерсть «протекает» на живот), авто-префаб не нужен.
+    public const string PlayerFolder = Folder + "/Gorilla_Final/";
+    static bool IsPlayerAsset(string path) => path.Replace('\\', '/').StartsWith(PlayerFolder);
+
     static bool IsModel(string path)
     {
         string ext = Path.GetExtension(path).ToLowerInvariant();
@@ -34,7 +39,8 @@ public class TripoAssetPostprocessor : AssetPostprocessor
     {
         if (!InFolder(assetPath)) return;
         var ti = (TextureImporter)assetImporter;
-        ti.maxTextureSize = MaxTextureSize;
+        int max = IsPlayerAsset(assetPath) ? 512 : MaxTextureSize;
+        ti.maxTextureSize = max;
         ti.mipmapEnabled = true;
         ti.filterMode = FilterMode.Bilinear;            // soft, "soapy" look
         ti.anisoLevel = 0;
@@ -42,9 +48,9 @@ public class TripoAssetPostprocessor : AssetPostprocessor
         foreach (var platform in new[] { "Android", "Standalone" })
         {
             var ps = ti.GetPlatformTextureSettings(platform);
-            if (ps.overridden && ps.maxTextureSize > MaxTextureSize)
+            if (ps.overridden && ps.maxTextureSize > max)
             {
-                ps.maxTextureSize = MaxTextureSize;
+                ps.maxTextureSize = max;
                 ti.SetPlatformTextureSettings(ps);
             }
         }
@@ -61,9 +67,9 @@ public class TripoAssetPostprocessor : AssetPostprocessor
     {
         var todo = new List<string>();
         foreach (var p in imported)
-            if (InFolder(p) && IsModel(p)) todo.Add(p);
+            if (InFolder(p) && IsModel(p) && !IsPlayerAsset(p)) todo.Add(p);
         foreach (var p in moved)
-            if (InFolder(p) && IsModel(p) && !todo.Contains(p)) todo.Add(p);
+            if (InFolder(p) && IsModel(p) && !IsPlayerAsset(p) && !todo.Contains(p)) todo.Add(p);
         if (todo.Count == 0) return;
         // creating assets inside the import callback is unsafe -> do it right after
         EditorApplication.delayCall += () => { foreach (var p in todo) Process(p); };
@@ -75,7 +81,7 @@ public class TripoAssetPostprocessor : AssetPostprocessor
         foreach (var guid in AssetDatabase.FindAssets("t:GameObject", new[] { Folder }))
         {
             string p = AssetDatabase.GUIDToAssetPath(guid);
-            if (IsModel(p)) Process(p);
+            if (IsModel(p) && !IsPlayerAsset(p)) Process(p);
         }
     }
 

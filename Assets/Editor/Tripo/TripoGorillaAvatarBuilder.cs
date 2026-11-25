@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -28,7 +28,7 @@ public static class TripoGorillaAvatarBuilder
     public static float ArmReach = 0.62f;      // длина руки (плечо → кончик кисти) в метрах после масштаба
     public static float FurTexScale = 0.8f;    // яркость «нейтральной» текстуры шерсти
 
-    [MenuItem("Tools/Heist/Player/Build Tripo Gorilla Avatar")]
+    [MenuItem("Tools/Heist/Player/(Old) Build Tripo Gorilla Avatar v1")]
     public static void BuildMenu() => Debug.Log(Build());
 
     public static string Build()
@@ -324,7 +324,7 @@ public static class TripoGorillaAvatarBuilder
         return items;
     }
 
-    static GameObject Prim(Transform parent, string name, PrimitiveType type, Vector3 localPos, Quaternion localRot, Vector3 scale, Material mat)
+    internal static GameObject Prim(Transform parent, string name, PrimitiveType type, Vector3 localPos, Quaternion localRot, Vector3 scale, Material mat)
     {
         var go = GameObject.CreatePrimitive(type);
         go.name = name;
@@ -339,7 +339,7 @@ public static class TripoGorillaAvatarBuilder
         return go;
     }
 
-    static void SetLayer(Transform t, int layer)
+    internal static void SetLayer(Transform t, int layer)
     {
         foreach (var c in t.GetComponentsInChildren<Transform>(true)) c.gameObject.layer = layer;
     }
@@ -366,7 +366,7 @@ public static class TripoGorillaAvatarBuilder
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    static Material Mat(string name, Texture tex, Color color, float metallic = 0f, float smoothness = 0f, Color? emission = null)
+    internal static Material Mat(string name, Texture tex, Color color, float metallic = 0f, float smoothness = 0f, Color? emission = null)
     {
         string path = $"{MatDir}/{name}.mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);

@@ -69,6 +69,8 @@ public class DesktopTestPlayer : MonoBehaviour
 
     void OnGUI()
     {
+        // экранный текст (IMGUI) в шлеме двоится и уезжает за край — показываем только на мониторе
+        if (UnityEngine.XR.XRSettings.isDeviceActive) return;
         float cx = Screen.width / 2f, cy = Screen.height / 2f;
         GUI.Label(new Rect(cx - 5, cy - 11, 20, 22), "+");
 
