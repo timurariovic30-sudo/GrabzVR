@@ -1,0 +1,8 @@
+monkey.glb
+"Monkey" by cohenwiltsey9 — https://sketchfab.com/3d-models/monkey-f6a912840eec4111b48c0284f867d23f
+Author: https://sketchfab.com/cohenwiltsey9
+License: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes made in this project: materials/textures replaced, head mesh split off (Assets/Art/Models/Generated),
+bandit mask, eyes, muzzle and palms added from primitives, model rigged to the VR player.
+The attribution above must appear in the game's credits.
