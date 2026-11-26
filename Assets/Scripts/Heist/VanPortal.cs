@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -59,6 +59,7 @@ public class VanPortal : MonoBehaviour
         if (countdownText) countdownText.text = "НА ДЕЛО!";
         GameSession.ArrivedFromHub = true;
         yield return ScreenFader.FadeOut(fadeMaterial, fadeTime);
-        SceneManager.LoadScene(sceneName);
+        // в сети — едут все игроки сессии (общая смена сцены Fusion), без сети — как раньше
+        if (!FusionNetworkManager.LoadSceneSynced(sceneName)) SceneManager.LoadScene(sceneName);
     }
 }

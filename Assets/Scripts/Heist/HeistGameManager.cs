@@ -118,7 +118,12 @@ public class HeistGameManager : MonoBehaviour
     {
         yield return new WaitForSecondsRealtime(restartDelay);
         // После раунда — назад в Главный Хаб (если он есть в Build Settings), иначе перезапуск уровня
-        if (Application.CanStreamedLevelBeLoaded(GameSession.HubScene)) { SceneManager.LoadScene(GameSession.HubScene); yield break; }
+        if (Application.CanStreamedLevelBeLoaded(GameSession.HubScene))
+        {
+            GameSession.ArrivedFromHub = false;
+            if (!FusionNetworkManager.LoadSceneSynced(GameSession.HubScene)) SceneManager.LoadScene(GameSession.HubScene);
+            yield break;
+        }
         var scene = gameObject.scene;
 #if UNITY_EDITOR
         UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(scene.path, new LoadSceneParameters(LoadSceneMode.Single));

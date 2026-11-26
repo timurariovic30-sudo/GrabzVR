@@ -50093,6 +50093,54 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 775125871}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &775544040
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 775544042}
+  - component: {fileID: 775544041}
+  m_Layer: 0
+  m_Name: FusionNetworkManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &775544041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 775544040}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fe6ec0cd9271564790d6edf25ba1b14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FusionNetworkManager
+  runnerPrefab: {fileID: 8866196734518015285, guid: 790192f1104d7434a888f5827a0355a5, type: 3}
+  avatarPrefab: {fileID: 8432386922512929850, guid: 737fc48361f4db4409aa35d74fcb759a, type: 3}
+  autoConnect: 1
+  maxPlayers: 10
+--- !u!4 &775544042
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 775544040}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &778069044
 GameObject:
   m_ObjectHideFlags: 0
@@ -56383,6 +56431,8 @@ MonoBehaviour:
   - {fileID: 358972623}
   - {fileID: 1016511291}
   - {fileID: 572199837}
+  useNetworkId: 0
+  networkId: 
 --- !u!114 &894785018
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -64815,6 +64865,7 @@ MonoBehaviour:
   furMaterial: {fileID: 2100000, guid: 7a91cc4cb87b28840a22db9580a8d461, type: 2}
   furColor: {r: 0.40491122, g: 0.62156105, b: 0.25936595, a: 1}
   loadSavedColor: 1
+  isNetworkProxy: 0
   presets:
   - {r: 0.40491122, g: 0.62156105, b: 0.25936595, a: 1}
   - {r: 0.45, g: 0.29, b: 0.17, a: 1}
@@ -143292,3 +143343,4 @@ SceneRoots:
   - {fileID: 224250044}
   - {fileID: 2005342864}
   - {fileID: 112801077}
+  - {fileID: 775544042}

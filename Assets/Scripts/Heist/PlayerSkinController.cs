@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -17,6 +17,8 @@ public class PlayerSkinController : MonoBehaviour
     public Color furColor = new Color(0.17f, 0.17f, 0.19f);
     [Tooltip("Загружать сохранённый цвет из PlayerPrefs при старте")]
     public bool loadSavedColor = true;
+    [Tooltip("Это горилла другого игрока (сеть): её красит только сеть, кнопки хаба и F2 на неё не действуют")]
+    public bool isNetworkProxy;
 
     [Header("Готовые скины (для теста — клавиша ниже циклически их переключает)")]
     public Color[] presets =
@@ -36,7 +38,7 @@ public class PlayerSkinController : MonoBehaviour
 
     void Awake()
     {
-        if (loadSavedColor && TryLoadColor(out var saved)) furColor = saved;
+        if (loadSavedColor && !isNetworkProxy && TryLoadColor(out var saved)) furColor = saved;
     }
 
     void OnEnable() => Apply();
@@ -44,6 +46,7 @@ public class PlayerSkinController : MonoBehaviour
 
     void Update()
     {
+        if (isNetworkProxy) return;
         var kb = Keyboard.current;
         if (kb != null && presets.Length > 0 && kb[cycleKey].wasPressedThisFrame)
         {
@@ -55,13 +58,25 @@ public class PlayerSkinController : MonoBehaviour
     /// Поменять цвет шерсти (например, при выборе скина в магазине или по сети).
     public void SetFurColor(Color color, bool save = false)
     {
+        if (isNetworkProxy) return; // чужую гориллу перекрашивает только сеть
         furColor = color;
         Apply();
         if (save) SaveColor(color);
     }
 
+    /// Цвет гориллы другого игрока, пришедший по сети.
+    public void SetNetworkColor(Color color)
+    {
+        furColor = color;
+        Apply();
+    }
+
+    /// Срабатывает при каждом сохранении цвета (PlayFab отправляет его на сервер, сеть — другим игрокам).
+    public static event System.Action<Color> ColorChanged;
+
     public static void SaveColor(Color c)
     {
+        ColorChanged?.Invoke(c);
         PlayerPrefs.SetString(PrefsKey, "#" + ColorUtility.ToHtmlStringRGB(c));
         PlayerPrefs.Save();
     }

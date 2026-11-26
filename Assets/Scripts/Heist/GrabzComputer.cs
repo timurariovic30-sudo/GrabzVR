@@ -113,7 +113,9 @@ public class GrabzComputer : MonoBehaviour
                 else if (key == "ENTER")
                 {
                     GrabzSettings.RoomCode = roomInput;
-                    Status(roomInput.Length == 0 ? "ВВЕДИ КОД КОМНАТЫ" : $"КОМНАТА {roomInput} СОХРАНЕНА\n(СЕТЕВАЯ ИГРА ЕЩЁ НЕ ПОДКЛЮЧЕНА)");
+                    string room = roomInput.Length == 0 ? FusionNetworkManager.DefaultRoom : roomInput;
+                    if (FusionNetworkManager.Instance) { FusionNetworkManager.Instance.Reconnect(room); Status($"ПОДКЛЮЧАЮСЬ К КОМНАТЕ {room}..."); }
+                    else Status($"КОМНАТА {room} СОХРАНЕНА (СЕТИ В ЭТОЙ СЦЕНЕ НЕТ)");
                 }
                 break;
             case "NAME":
@@ -138,7 +140,7 @@ public class GrabzComputer : MonoBehaviour
                 if (opt >= 1 && opt <= 3) GrabzSettings.Queue = opt - 1;
                 break;
             case "GROUP":
-                if (key == "ENTER") Status("ГРУППА: НУЖНА СЕТЕВАЯ ИГРА\n(ПОКА ТОЛЬКО ОДИН ИГРОК)");
+                if (key == "ENTER") Status("ГРУППА = ОДНА КОМНАТА: ВВЕДИТЕ ОДИН КОД ВО ВКЛАДКЕ ROOM.\nВ ФУРГОН ЕДЕТ ВСЯ КОМНАТА.");
                 break;
             case "VOICE":
                 if (opt == 1 || opt == 2) GrabzSettings.Voice = opt - 1;
@@ -171,7 +173,17 @@ public class GrabzComputer : MonoBehaviour
     void LateUpdate()
     {
         if (status != "" && Time.time > statusUntil) { status = ""; Refresh(); }
+        // статус сети (ONLINE / ROOM / PLAYERS) обновляется раз в секунду
+        if (Time.unscaledTime > nextNetRefresh)
+        {
+            nextNetRefresh = Time.unscaledTime + 1f;
+            string net = FusionNetworkManager.StatusLine;
+            if (net != lastNet) { lastNet = net; Refresh(); }
+        }
     }
+
+    float nextNetRefresh;
+    string lastNet = "";
 
     public void Refresh()
     {
@@ -185,8 +197,8 @@ public class GrabzComputer : MonoBehaviour
         if (!screenText) return;
         var s = new StringBuilder();
         s.AppendLine("<b>GRABZ OS v1.0</b>");
-        s.AppendLine("<size=80%>ИГРОКОВ ОНЛАЙН: 1</size>");
-        s.AppendLine($"<size=80%>НИК: {GrabzSettings.PlayerName}   КОМНАТА: {(GrabzSettings.RoomCode == "" ? "-" : GrabzSettings.RoomCode)}</size>");
+        s.AppendLine($"<size=80%><color=#B6FFB6>{FusionNetworkManager.StatusLine}</color></size>");
+        s.AppendLine($"<size=80%>НИК: {GrabzSettings.PlayerName}   {PlayFabAuthManager.Status}</size>");
         s.AppendLine("<size=60%>------------------------------------------</size>");
         switch (Tabs[tab])
         {
@@ -217,7 +229,7 @@ public class GrabzComputer : MonoBehaviour
             case "MIC":
                 for (int i = 0; i < 3; i++)
                     s.AppendLine(((int)GrabzSettings.Mic == i ? "> " : "  ") + $"OPTION {i + 1}: {GrabzSettings.MicNames[i]}");
-                s.AppendLine("<size=70%>(ГОЛОСОВОЙ ЧАТ ПОЯВИТСЯ С СЕТЕВОЙ ИГРОЙ)</size>");
+                s.AppendLine("<size=70%>КНОПКА РАЦИИ: A / X НА КОНТРОЛЛЕРЕ ИЛИ V НА КЛАВИАТУРЕ</size>");
                 break;
             case "QUEUE":
                 for (int i = 0; i < 3; i++)

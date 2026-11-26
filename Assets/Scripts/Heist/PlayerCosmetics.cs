@@ -7,12 +7,15 @@ using UnityEngine;
 public class PlayerCosmetics : MonoBehaviour
 {
     public GameObject[] items;
+    [Tooltip("Горилла другого игрока: косметика приходит по сети, а не из своего выбора")]
+    public bool useNetworkId;
+    public string networkId = "";
 
     void Start() => Apply();
 
     public void Apply()
     {
-        string id = GameSession.Cosmetic;
+        string id = useNetworkId ? networkId : GameSession.Cosmetic;
         if (items == null) return;
         foreach (var it in items) if (it) it.SetActive(it.name == id);
     }
