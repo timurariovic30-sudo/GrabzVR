@@ -135,13 +135,13 @@ public static class MainHubBuilder
         // Табличка у спавна
         var sign = Group(st, "RulesSign");
         sign.SetPositionAndRotation(new Vector3(-2.8f, 0, -5.2f), Quaternion.LookRotation(new Vector3(0.45f, 0, -1f)));
-        Box(sign, "Post", new Vector3(0, 0.8f, -0.07f), new Vector3(0.08f, 1.6f, 0.08f), "DarkMetal"); // за доской, не перед текстом
+        Box(sign, "Post", new Vector3(0, 0.8f, -0.08f), new Vector3(0.1f, 1.6f, 0.1f), "WoodDark"); // деревянный столб за доской
         var board = Box(sign, "Board", new Vector3(0, 1.55f, 0), new Vector3(2.1f, 1.2f, 0.05f), null, false);
         var green = SignGreenMaterial();
         board.GetComponent<Renderer>().sharedMaterial = green;
-        Box(sign, "BoardFrame", new Vector3(0, 1.55f, -0.005f), new Vector3(2.18f, 1.28f, 0.04f), "DarkMetal", false);
-        Text(sign, "Rules", "<b>ДОБРО ПОЖАЛОВАТЬ В УБЕЖИЩЕ!</b>\n1. СТОЛ ПЛАНИРОВАНИЯ — ВЫБЕРИ РЕЖИМ\n2. ГАРДЕРОБ СЛЕВА — ЦВЕТ, ЗЕРКАЛО, КОСМЕТИКА\n3. ЗАПРЫГНИ В ФУРГОН — ПОЕХАЛИ НА ДЕЛО!\n4. БАСКЕТБОЛ СПРАВА — РАЗМИНКА",
-            1.3f, Color.white, new Vector3(0, 1.55f, 0.03f), Quaternion.Euler(0, 180, 0), new Vector2(1.95f, 1.05f), TextAlignmentOptions.Left, true);
+        Box(sign, "BoardFrame", new Vector3(0, 1.55f, -0.008f), new Vector3(2.26f, 1.36f, 0.05f), "WoodDark", false); // деревянная рамка
+        Text(sign, "Rules", "ДОБРО ПОЖАЛОВАТЬ В УБЕЖИЩЕ!\n\n1. СТОЛ ПЛАНИРОВАНИЯ — ВЫБЕРИ РЕЖИМ\n2. ГАРДЕРОБ СЛЕВА — ЦВЕТ, ЗЕРКАЛО, КОСМЕТИКА\n3. ЗАПРЫГНИ В ФУРГОН — ПОЕХАЛИ НА ДЕЛО!\n4. БАСКЕТБОЛ СПРАВА — РАЗМИНКА",
+            1.3f, Color.white, new Vector3(0, 1.55f, 0.03f), Quaternion.Euler(0, 180, 0), new Vector2(1.95f, 1.05f), TextAlignmentOptions.Left, false); // обычный (не жирный) белый шрифт
     }
 
     static void BuildSecondLevel(Transform st)
