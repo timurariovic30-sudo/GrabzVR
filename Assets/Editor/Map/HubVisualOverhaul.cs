@@ -592,9 +592,12 @@ public static class HubVisualOverhaul
     static void BuildVanDecor(Transform st, Transform map)
     {
         var van = map.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name.StartsWith("Hub_Van") && PrefabUtility.IsAnyPrefabInstanceRoot(t.gameObject));
+        // чёрный автобус (BlackBusBuilder) заменил джип: у него свои LED-фары, рамка шире на ступеньку у входа
+        var bus = map.gameObject.scene.GetRootGameObjects().FirstOrDefault(r => r.name == BlackBusBuilder.RootName);
         var g = Group(st, "VanDecor");
         Bounds b;
-        if (van)
+        if (bus) b = BlackBusBuilder.BusFootprint(bus.transform);
+        else if (van)
         {
             var rs = van.GetComponentsInChildren<Renderer>();
             b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
@@ -603,7 +606,7 @@ public static class HubVisualOverhaul
 
         // фары (спереди, к северной стене) и задние фонари (к игрокам) — светятся в Bloom
         float hy = b.min.y + b.size.y * 0.3f;
-        foreach (float sx in new[] { -1f, 1f })
+        foreach (float sx in bus ? new float[0] : new[] { -1f, 1f })
         {
             float x = b.center.x + sx * b.extents.x * 0.68f;
             Sphere(g, "Headlight", new Vector3(x, hy, b.max.z - 0.02f), new Vector3(0.28f, 0.2f, 0.06f), headlight);
@@ -611,7 +614,7 @@ public static class HubVisualOverhaul
         }
         // разметка парковки: жёлтая рамка вокруг фургона + стрелка-полосы к нему
         float m = 0.45f, y = 0.008f;
-        float x0 = b.min.x - m, x1 = b.max.x + m, z0 = b.min.z - m, z1 = Mathf.Min(b.max.z + m, 13.6f);
+        float x0 = b.min.x - m, x1 = b.max.x + m, z0 = b.min.z - m - (bus ? 0.3f : 0f), z1 = Mathf.Min(b.max.z + m, 13.6f);
         Box(g, "Park_L", new Vector3(x0, y, (z0 + z1) / 2), new Vector3(0.14f, 0.01f, z1 - z0), paint, 2.5f, false);
         Box(g, "Park_R", new Vector3(x1, y, (z0 + z1) / 2), new Vector3(0.14f, 0.01f, z1 - z0), paint, 2.5f, false);
         Box(g, "Park_F", new Vector3((x0 + x1) / 2, y, z0), new Vector3(x1 - x0, 0.01f, 0.14f), paint, 2.5f, false);

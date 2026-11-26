@@ -140,7 +140,7 @@ public class GrabzComputer : MonoBehaviour
                 if (opt >= 1 && opt <= 3) GrabzSettings.Queue = opt - 1;
                 break;
             case "GROUP":
-                if (key == "ENTER") Status("ГРУППА = ОДНА КОМНАТА: ВВЕДИТЕ ОДИН КОД ВО ВКЛАДКЕ ROOM.\nВ ФУРГОН ЕДЕТ ВСЯ КОМНАТА.");
+                if (key == "ENTER") Status("ГРУППА = ОДНА КОМНАТА: ВВЕДИТЕ ОДИН КОД ВО ВКЛАДКЕ ROOM.\nВ АВТОБУСЕ ЕДЕТ ВСЯ КОМНАТА.");
                 break;
             case "VOICE":
                 if (opt == 1 || opt == 2) GrabzSettings.Voice = opt - 1;

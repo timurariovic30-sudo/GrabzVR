@@ -45,7 +45,7 @@ public class HubController : MonoBehaviour
     {
         int m = (int)GameSession.CurrentMode;
         if (modeBoardTitle) modeBoardTitle.text = "РЕЖИМ: " + GameSession.ModeTitles[m];
-        if (modeBoardHint) modeBoardHint.text = GameSession.ModeHints[m] + "\nЗАПРЫГНИ В ФУРГОН, ЧТОБЫ ПОЕХАТЬ НА ДЕЛО!";
+        if (modeBoardHint) modeBoardHint.text = GameSession.ModeHints[m] + "\nЗАЙДИ В АВТОБУС, ЧТОБЫ ПОЕХАТЬ НА ДЕЛО!";
         if (modeLamps == null) return;
         block ??= new MaterialPropertyBlock();
         for (int i = 0; i < modeLamps.Length; i++)
