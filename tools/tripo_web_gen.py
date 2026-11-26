@@ -92,7 +92,10 @@ def main():
     with sync_playwright() as pw:
         ctx = pw.chromium.launch_persistent_context(
             str(PROFILE), channel="chrome", headless=False, accept_downloads=True,
-            viewport={"width": 1500, "height": 900}, locale="ru-RU")
+            viewport={"width": 1500, "height": 900}, locale="ru-RU",
+            # без флага автоматизации: иначе вход через Google пишет «браузер может быть небезопасен»
+            ignore_default_args=["--enable-automation"],
+            args=["--disable-blink-features=AutomationControlled"])
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto(URL, wait_until="domcontentloaded")
 

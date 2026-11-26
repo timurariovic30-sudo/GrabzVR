@@ -125,3 +125,6 @@ tools/.tripo_browser_profile/
 __pycache__/
 *.pyc
 
+
+# превью Хаба (Tools/Heist/Hub/Capture Preview)
+HubPreview/
