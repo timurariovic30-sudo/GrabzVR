@@ -20,11 +20,13 @@ public class VRHandPoseController : MonoBehaviour
     {
         public string prefix = "Left_";
         public Transform hand;
-        [HideInInspector] public Finger[] fingers;
+        // строится в рантайме (Setup); null = ещё не настроено, поэтому не сериализуем
+        [System.NonSerialized] public Finger[] fingers;
         [HideInInspector] public float grip, trigger;
         [HideInInspector] public InputAction gripAction, triggerAction;
     }
 
+    [System.Serializable]
     public class Finger
     {
         public Transform[] bones;     // Proximal, Intermediate, Distal

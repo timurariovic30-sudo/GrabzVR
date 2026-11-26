@@ -160,7 +160,7 @@ namespace Photon.Voice.Unity.Demos.DemoVoiceUI
         void Awake()
         {
             #if ENABLE_INPUT_SYSTEM
-            var imOld = Object.FindFirstObjectByType<UnityEngine.EventSystems.StandaloneInputModule>();
+            var imOld = Object.FindAnyObjectByType<UnityEngine.EventSystems.StandaloneInputModule>();
             if (imOld != null)
             {
                 imOld.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();

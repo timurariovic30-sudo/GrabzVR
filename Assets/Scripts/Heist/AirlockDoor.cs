@@ -6,6 +6,7 @@ public class AirlockDoor : MonoBehaviour
 {
     SlidingDoor door;
     void Awake() => door = GetComponent<SlidingDoor>();
+    public bool IsOpen => door != null && door.IsOpen;
     public void Open() => door.Open();
     public void Close() => door.Close();
 }

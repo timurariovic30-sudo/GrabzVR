@@ -3509,6 +3509,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_Painting
       objectReference: {fileID: 0}
+    - target: {fileID: 6560169952523450865, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
+      propertyPath: SortKey
+      value: 3814870894
+      objectReference: {fileID: 0}
     - target: {fileID: 7437344397138894049, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
       propertyPath: m_LocalPosition.x
       value: -33.8
@@ -5253,6 +5257,10 @@ PrefabInstance:
     - target: {fileID: 2391785450799002756, guid: 7bc133585356ac34b99ae3129e3f6038, type: 3}
       propertyPath: m_Name
       value: Loot_Safe
+      objectReference: {fileID: 0}
+    - target: {fileID: 5183490522932146221, guid: 7bc133585356ac34b99ae3129e3f6038, type: 3}
+      propertyPath: SortKey
+      value: 2561987204
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -15163,6 +15171,84 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 233142213}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &233604916
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 233604919}
+  - component: {fileID: 233604918}
+  - component: {fileID: 233604917}
+  m_Layer: 0
+  m_Name: HeistNetworkState
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &233604917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 233604916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f4ac7082fbd2e242885d7c0a732f5d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeistNetworkState
+  _RoundState: 0
+  _TimeLeft: 0
+  _Loot: 0
+  _Mode: 0
+  _AlarmRemaining: 0
+  _ManualAlarm:
+    RawValue: 0
+  _GlassBroken: 0
+  _EventText:
+    _length: 0
+    _data:
+      Data: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000u
+  _EventSeq: 0
+--- !u!114 &233604918
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 233604916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 142875032
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 131074
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 233604917}
+  ForceRemoteRenderTimeframe: 0
+--- !u!4 &233604919
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 233604916}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &234974443
 GameObject:
   m_ObjectHideFlags: 0
@@ -22104,6 +22190,10 @@ PrefabInstance:
     - target: {fileID: 691539576443729311, guid: a02ba43016b163a438c56d8db9e55c92, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2380966147076680818, guid: a02ba43016b163a438c56d8db9e55c92, type: 3}
+      propertyPath: SortKey
+      value: 1153695228
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -61701,6 +61791,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2380966147076680818, guid: a02ba43016b163a438c56d8db9e55c92, type: 3}
+      propertyPath: SortKey
+      value: 1037731219
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -67225,6 +67319,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_GoldBar
       objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 1224759228
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -68120,6 +68218,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_Painting
       objectReference: {fileID: 0}
+    - target: {fileID: 6560169952523450865, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
+      propertyPath: SortKey
+      value: 1967479638
+      objectReference: {fileID: 0}
     - target: {fileID: 7437344397138894049, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
       propertyPath: m_LocalPosition.x
       value: 20
@@ -68971,6 +69073,10 @@ PrefabInstance:
     - target: {fileID: 5160473954455753409, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
       propertyPath: m_Name
       value: Loot_Painting
+      objectReference: {fileID: 0}
+    - target: {fileID: 6560169952523450865, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
+      propertyPath: SortKey
+      value: 5307020
       objectReference: {fileID: 0}
     - target: {fileID: 7437344397138894049, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
       propertyPath: m_LocalPosition.x
@@ -72895,6 +73001,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_GoldBar
       objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 3862812313
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -74775,6 +74885,10 @@ PrefabInstance:
     - target: {fileID: 1177353507115411822, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
       propertyPath: m_Name
       value: Loot_GoldBar
+      objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 1618708058
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -79094,6 +79208,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 905040818}
     m_Modifications:
+    - target: {fileID: 1220950940524335381, guid: 634369c7db31c5c42ab93660df6fe1ed, type: 3}
+      propertyPath: SortKey
+      value: 1349053123
+      objectReference: {fileID: 0}
     - target: {fileID: 4002265912080437988, guid: 634369c7db31c5c42ab93660df6fe1ed, type: 3}
       propertyPath: m_Name
       value: Loot_Vase
@@ -80163,6 +80281,10 @@ PrefabInstance:
     - target: {fileID: 7474558357963133225, guid: 207429a13bbff3144aa5698b79f150aa, type: 3}
       propertyPath: m_Name
       value: Loot_Diamond
+      objectReference: {fileID: 0}
+    - target: {fileID: 8236647627337988631, guid: 207429a13bbff3144aa5698b79f150aa, type: 3}
+      propertyPath: SortKey
+      value: 4149166532
       objectReference: {fileID: 0}
     - target: {fileID: 8523113519910599320, guid: 207429a13bbff3144aa5698b79f150aa, type: 3}
       propertyPath: m_LocalPosition.x
@@ -82511,6 +82633,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_Painting
       objectReference: {fileID: 0}
+    - target: {fileID: 6560169952523450865, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
+      propertyPath: SortKey
+      value: 149012040
+      objectReference: {fileID: 0}
     - target: {fileID: 7437344397138894049, guid: ac99b49d4283e4f4ba42f66c4dae1777, type: 3}
       propertyPath: m_LocalPosition.x
       value: 33.8
@@ -82612,6 +82738,10 @@ PrefabInstance:
     - target: {fileID: 1177353507115411822, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
       propertyPath: m_Name
       value: Loot_GoldBar
+      objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 132269266
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -96494,6 +96624,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 905040818}
     m_Modifications:
+    - target: {fileID: 1220950940524335381, guid: 634369c7db31c5c42ab93660df6fe1ed, type: 3}
+      propertyPath: SortKey
+      value: 3325227803
+      objectReference: {fileID: 0}
     - target: {fileID: 4002265912080437988, guid: 634369c7db31c5c42ab93660df6fe1ed, type: 3}
       propertyPath: m_Name
       value: Loot_Vase
@@ -101317,6 +101451,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_GoldBar
       objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 3483746343
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -105451,6 +105589,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Loot_GoldBar
       objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 920503459
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -108449,6 +108591,10 @@ PrefabInstance:
     - target: {fileID: 1177353507115411822, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
       propertyPath: m_Name
       value: Loot_GoldBar
+      objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 3505256768
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -115774,6 +115920,10 @@ PrefabInstance:
     - target: {fileID: 1177353507115411822, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
       propertyPath: m_Name
       value: Loot_GoldBar
+      objectReference: {fileID: 0}
+    - target: {fileID: 3504185816340980736, guid: 8cac47d188396c1499e3311bbb4b5a0c, type: 3}
+      propertyPath: SortKey
+      value: 3747561500
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -143344,3 +143494,4 @@ SceneRoots:
   - {fileID: 2005342864}
   - {fileID: 112801077}
   - {fileID: 775544042}
+  - {fileID: 233604919}

@@ -36,7 +36,7 @@
         public class MicrophoneSelectorEvent: UnityEvent<MicType, DeviceInfo>
         {}
 
-        public MicrophoneSelectorEvent onValueChanged = new MicrophoneSelectorEvent();
+        [System.NonSerialized] public MicrophoneSelectorEvent onValueChanged = new MicrophoneSelectorEvent(); // GrabzVR: и так не сериализовался (UAC1001)
 
         private List<MicRef> micOptions;
 

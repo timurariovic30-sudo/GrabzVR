@@ -111,7 +111,7 @@ public class VRGrabber : MonoBehaviour
             var item = Held;
             Release();
             float speed = item.isHeavy ? throwSpeed * 0.35f : throwSpeed;
-            item.Body.linearVelocity = AimTransform.forward * speed + Vector3.up * 1.5f;
+            if (!item.Body.isKinematic) item.Body.linearVelocity = AimTransform.forward * speed + Vector3.up * 1.5f;
         }
     }
 
@@ -164,13 +164,14 @@ public class VRGrabber : MonoBehaviour
             foreach (var c in Physics.OverlapSphere(transform.position, handGrabRadius, ~0, QueryTriggerInteraction.Ignore))
             {
                 var item = c.attachedRigidbody ? c.attachedRigidbody.GetComponent<LootItem>() : null;
-                if (item == null) continue;
+                if (item == null || !item.CanBeGrabbed) continue;
                 float d = (c.ClosestPoint(transform.position) - transform.position).sqrMagnitude;
                 if (d < bestDist) { bestDist = d; best = item; }
             }
         }
 
-        if (best == null) return;
+        // предмет в руках другого игрока (сеть) или уже сдан/разбит — взять нельзя
+        if (best == null || !best.CanBeGrabbed) return;
         if (best.Holder != null) best.Holder.Release(); // перехват из другой руки
 
         Held = best;
@@ -216,6 +217,8 @@ public class VRGrabber : MonoBehaviour
     {
         if (Held == null) return;
         var rb = Held.Body;
+        // по сети власть над предметом ещё не пришла (тело кинематическое) — ждём
+        if (rb.isKinematic) return;
 
         Vector3 targetPos = input == GrabInput.Mouse
             ? AimTransform.position + AimTransform.forward * currentHoldDistance

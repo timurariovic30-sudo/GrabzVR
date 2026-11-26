@@ -12,6 +12,9 @@ GameObject:
   - component: {fileID: 4795524630923249368}
   - component: {fileID: 1661323918124441843}
   - component: {fileID: 2170218668009126183}
+  - component: {fileID: 3504185816340980736}
+  - component: {fileID: 2311692766512348293}
+  - component: {fileID: 8909968296247508197}
   m_Layer: 0
   m_Name: Loot_GoldBar
   m_TagString: Loot
@@ -112,6 +115,85 @@ MonoBehaviour:
   glowColor: {r: 1, g: 0.7, b: 0.2, a: 1}
   glowLight: 0
   glowRange: 1.5
+--- !u!114 &3504185816340980736
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1177353507115411822}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 2863727722
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 524546
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 2311692766512348293}
+  - {fileID: 8909968296247508197}
+  ForceRemoteRenderTimeframe: 0
+--- !u!114 &2311692766512348293
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1177353507115411822}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkTransform
+  _stateAuthorityChangeErrorCorrectionDelta: 0
+  SyncScale: 0
+  SyncParent: 0
+  _autoAOIOverride: 1
+  ConfigFlags: 1
+  PhysicsSettings:
+    ForecastEnabled: 1
+    DebugPhysics: 0
+    GravityForecast: 2
+    MaxExtrapolationTime: 0.15
+    MinLinearDetectedError: 0.02
+    MinAngularDetectedError: 3
+    DeadzoneVelocityMode: 0
+    MaxLinearError: 0
+    MaxAngularError: 0
+    LowCorrectionProgressThreshold: 0.015
+    HighErrorSimilarityThreshold: 1
+    MaxErrorTotalTime: 0.5
+    MaxRemoteSleepIgnoreTime: 0.5
+    ErrorCorrectionType: 0
+    LinearVelCorrectionMul: 1
+    AngularVelCorrectionMul: 1
+    PositionCorrectionLerp: 0.15
+    RotationCorrectionLerp: 0.15
+    Spring: 75
+    Damper: 2
+    MinImpactfulCollisionAlignment: 0.3
+    ImpactStartCorrectionTime: 0.1
+    ImpactCorrectionTimeComplete: 0.3
+--- !u!114 &8909968296247508197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1177353507115411822}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b8b87d85f365d4469d272d881fc987c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkLootItem
+  _IsGrabbed:
+    RawValue: 0
+  _WasGrabbed:
+    RawValue: 0
+  _StateValue: 0
 --- !u!1 &2076648172562737170
 GameObject:
   m_ObjectHideFlags: 0
