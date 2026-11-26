@@ -357,8 +357,8 @@ public static class GorillaFinalAvatarBuilder
             skinCtl.furColor = furDefault;
             skinCtl.presets[0] = furDefault;
 
-            BuildWristDisplay(offset.Find("Left Controller"), playerLayer);
             if (!root.GetComponent<GorillaStickTurn>()) root.AddComponent<GorillaStickTurn>(); // поворот стиком (GRABZ OS → TURN)
+            SetupFingers(root);
 
             cam.cullingMask &= ~(1 << localHead);
             cam.nearClipPlane = 0.01f;
@@ -426,47 +426,36 @@ public static class GorillaFinalAvatarBuilder
         return items;
     }
 
-    /// World Space Canvas на левом запястье (вместо экранного текста).
-    static void BuildWristDisplay(Transform leftController, int layer)
+    /// Пальцы от Grip/Trigger (VRHandPoseController) + точные триггеры клавиатуры на кончиках указательных.
+    public static string SetupFingers(GameObject root)
     {
-        if (!leftController) return;
-        var old = leftController.Find("WristDisplay");
-        if (old) Object.DestroyImmediate(old.gameObject);
-
-        var go = new GameObject("WristDisplay", typeof(RectTransform), typeof(Canvas), typeof(WristDisplay));
-        go.layer = layer;
-        var rt = (RectTransform)go.transform;
-        rt.SetParent(leftController, false);
-        // на тыльной стороне запястья, чуть позади контроллера; экран смотрит вверх и на игрока
-        rt.localPosition = new Vector3(-0.015f, 0.035f, -0.1f);
-        rt.localRotation = Quaternion.Euler(55f, 0f, 0f);
-        rt.sizeDelta = new Vector2(420, 170);
-        rt.localScale = Vector3.one * 0.00025f;               // 420 px → 10.5 см
-        var canvas = go.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.WorldSpace;
-        canvas.worldCamera = leftController.parent ? leftController.parent.GetComponentInChildren<Camera>(true) : null; // Event Camera
-        canvas.sortingOrder = 10;
-
-        var bg = new GameObject("Back", typeof(RectTransform), typeof(UnityEngine.UI.Image));
-        bg.layer = layer;
-        var brt = (RectTransform)bg.transform;
-        brt.SetParent(rt, false);
-        brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = brt.offsetMax = Vector2.zero;
-        bg.GetComponent<UnityEngine.UI.Image>().color = new Color(0.05f, 0.06f, 0.08f, 0.85f);
-
-        var tgo = new GameObject("Text", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI));
-        tgo.layer = layer;
-        var trt = (RectTransform)tgo.transform;
-        trt.SetParent(rt, false);
-        trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one; trt.offsetMin = new Vector2(14, 8); trt.offsetMax = new Vector2(-14, -8);
-        var tmp = tgo.GetComponent<TMPro.TextMeshProUGUI>();
-        var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(MapKit.FontPath);
-        if (font) tmp.font = font;
-        tmp.fontSize = 44; tmp.enableAutoSizing = true; tmp.fontSizeMin = 18; tmp.fontSizeMax = 52;
-        tmp.alignment = TMPro.TextAlignmentOptions.Center;
-        tmp.color = Color.white;
-        tmp.text = "ХАБ";
-        go.GetComponent<WristDisplay>().text = tmp;
+        var rig = root.GetComponentInChildren<GorillaFinalRig>(true);
+        if (!rig) return "[Fingers] no rig";
+        rig.mirrorRightFromLeft = true;
+        var pose = root.GetComponent<VRHandPoseController>() ?? root.AddComponent<VRHandPoseController>();
+        pose.avatarRoot = rig.transform;
+        int ignore = LayerMask.NameToLayer("Ignore Raycast");
+        string report = "";
+        foreach (var (prefix, isLeft) in new[] { ("Left_", true), ("Right_", false) })
+        {
+            var hand = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == prefix + "Hand");
+            if (hand) (isLeft ? pose.left : pose.right).hand = hand;
+            var tipBone = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == prefix + "IndexDistalEnd");
+            if (!tipBone) continue;
+            var old = tipBone.Find("KeyTipTrigger");
+            if (old) Object.DestroyImmediate(old.gameObject);
+            var go = new GameObject("KeyTipTrigger");
+            go.layer = ignore;
+            go.transform.SetParent(tipBone, false);
+            var col = go.AddComponent<SphereCollider>();
+            col.isTrigger = true;
+            col.radius = 0.018f / Mathf.Max(1e-4f, tipBone.lossyScale.x);   // 1.8 см в мире
+            var rb = go.AddComponent<Rigidbody>();
+            rb.isKinematic = true; rb.useGravity = false;
+            go.AddComponent<ComputerKeyTrigger>().isLeft = isLeft;
+            report += $"{prefix}tip r={col.radius:0.0000} ";
+        }
+        return "[Fingers] " + report;
     }
 
     // ------------------------------------------------------------------ helpers

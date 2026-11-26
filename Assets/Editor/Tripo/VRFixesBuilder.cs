@@ -33,7 +33,8 @@ public static class VRFixesBuilder
         var sb = new StringBuilder();
         sb.AppendLine(BuildCyrillicFont());
         sb.AppendLine(FixMirrors());
-        sb.AppendLine(FixWristDisplay());
+        sb.AppendLine(FixFontMaterials());
+        sb.AppendLine(RemovePlayerUI());
         foreach (var s in Scenes) sb.AppendLine(FixScene(s));
         AssetDatabase.SaveAssets();
         return sb.ToString();
@@ -86,21 +87,44 @@ public static class VRFixesBuilder
         return $"[Font] static Cyrillic atlas: {fa.characterTable.Count} chars ({need.Length} requested, missing='{missing}'), main fallback -> {fa.name} (was {(oldFallback ? oldFallback.name : "none")})";
     }
 
-    /// Автоподбор размера текста пересчитывает раскладку много раз за обновление — на запястье не нужен.
-    static string FixWristDisplay()
+    /// На игроке (камера, XR Origin, руки) не должно быть НИКАКОГО текста и Canvas — только мир.
+    static string RemovePlayerUI()
     {
         var root = PrefabUtility.LoadPrefabContents(PrefabPath);
         try
         {
-            var w = root.GetComponentInChildren<WristDisplay>(true);
-            if (!w || !w.text) return "[Wrist] not found";
-            w.text.enableAutoSizing = false;
-            w.text.fontSize = 34;
-            w.text.overflowMode = TextOverflowModes.Ellipsis;
+            int n = 0;
+            foreach (var c in root.GetComponentsInChildren<Canvas>(true).Select(c => c.gameObject).Distinct().ToArray())
+                if (c) { Object.DestroyImmediate(c); n++; }
+            foreach (var t in root.GetComponentsInChildren<TMP_Text>(true).Select(t => t.gameObject).ToArray())
+                if (t) { Object.DestroyImmediate(t); n++; }
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-            return "[Wrist] auto-size off";
+            return $"[PlayerUI] removed {n} UI/text objects from VRGorillaPlayer";
         }
         finally { PrefabUtility.UnloadPrefabContents(root); }
+    }
+
+    /// Обычный мировой шейдер TextMeshPro/Distance Field (не Mobile, не Overlay) без «перспективного фильтра»:
+    /// фильтр размывает SDF-текст, когда на табличку смотрят под углом, — в шлеме угол меняется при каждом
+    /// повороте головы, и текст «плывёт».
+    static string FixFontMaterials()
+    {
+        var sh = Shader.Find("TextMeshPro/Distance Field");
+        int n = 0;
+        foreach (var path in new[] { MainFontPath, CyrFontPath })
+        {
+            var fa = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+            if (!fa || !fa.material) continue;
+            var m = fa.material;
+            m.shader = sh;
+            m.SetFloat("_PerspectiveFilter", 0f);
+            if (m.HasProperty("_Sharpness")) m.SetFloat("_Sharpness", 0.3f);
+            m.SetFloat("_FaceDilate", 0.05f);
+            ShaderUtilities.UpdateShaderRatios(m);
+            EditorUtility.SetDirty(m);
+            n++;
+        }
+        return $"[Font] {n} materials -> {sh.name}, perspective filter off";
     }
 
     // ------------------------------------------------------------------ зеркала
@@ -169,6 +193,8 @@ public static class VRFixesBuilder
         av.transform.localPosition = cam.transform.localPosition;
         av.transform.localRotation = Quaternion.identity;
         foreach (var t in av.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = localHead;
+        // кончики пальцев для клавиатуры нужны только VR-игроку
+        foreach (var tip in av.GetComponentsInChildren<ComputerKeyTrigger>(true).Select(t => t.gameObject).ToArray()) Object.DestroyImmediate(tip);
 
         var targets = new GameObject("AvatarTargets").transform;
         targets.SetParent(desk.transform, false);

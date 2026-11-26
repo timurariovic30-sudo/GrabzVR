@@ -136,9 +136,12 @@ public static class MainHubBuilder
         var sign = Group(st, "RulesSign");
         sign.SetPositionAndRotation(new Vector3(-2.8f, 0, -5.2f), Quaternion.LookRotation(new Vector3(0.45f, 0, -1f)));
         Box(sign, "Post", new Vector3(0, 0.8f, -0.07f), new Vector3(0.08f, 1.6f, 0.08f), "DarkMetal"); // за доской, не перед текстом
-        Box(sign, "Board", new Vector3(0, 1.55f, 0), new Vector3(1.9f, 1.1f, 0.05f), "Cork", false);
+        var board = Box(sign, "Board", new Vector3(0, 1.55f, 0), new Vector3(2.1f, 1.2f, 0.05f), null, false);
+        var green = SignGreenMaterial();
+        board.GetComponent<Renderer>().sharedMaterial = green;
+        Box(sign, "BoardFrame", new Vector3(0, 1.55f, -0.005f), new Vector3(2.18f, 1.28f, 0.04f), "DarkMetal", false);
         Text(sign, "Rules", "<b>ДОБРО ПОЖАЛОВАТЬ В УБЕЖИЩЕ!</b>\n1. СТОЛ ПЛАНИРОВАНИЯ — ВЫБЕРИ РЕЖИМ\n2. ГАРДЕРОБ СЛЕВА — ЦВЕТ, ЗЕРКАЛО, КОСМЕТИКА\n3. ЗАПРЫГНИ В ФУРГОН — ПОЕХАЛИ НА ДЕЛО!\n4. БАСКЕТБОЛ СПРАВА — РАЗМИНКА",
-            1.1f, new Color(0.15f, 0.08f, 0.03f), new Vector3(0, 1.55f, 0.03f), Quaternion.Euler(0, 180, 0), new Vector2(1.75f, 0.95f), TextAlignmentOptions.Left, false);
+            1.3f, Color.white, new Vector3(0, 1.55f, 0.03f), Quaternion.Euler(0, 180, 0), new Vector2(1.95f, 1.05f), TextAlignmentOptions.Left, true);
     }
 
     static void BuildSecondLevel(Transform st)
@@ -636,6 +639,17 @@ public static class MainHubBuilder
 
     static Material CosMat(string name) =>
         AssetDatabase.LoadAssetAtPath<Material>($"Assets/Art/Materials/Player/{name}.mat") ?? M("GoldGlow");
+
+    /// Доска таблички: Unlit — всегда ровный тёмно-зелёный, не зависит от света в ангаре.
+    static Material SignGreenMaterial()
+    {
+        string path = $"{MatDir}/M_Sign_DarkGreen_Unlit.mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m == null) { m = new Material(Shader.Find("Universal Render Pipeline/Unlit")); AssetDatabase.CreateAsset(m, path); }
+        m.SetColor("_BaseColor", new Color(0.04f, 0.26f, 0.11f));
+        EditorUtility.SetDirty(m);
+        return m;
+    }
 
     static Material LampMaterial()
     {

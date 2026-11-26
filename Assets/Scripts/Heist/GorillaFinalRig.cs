@@ -32,7 +32,7 @@ public class GorillaFinalRig : MonoBehaviour
 
         [HideInInspector] public Vector3 upperBindPos;
         [HideInInspector] public Quaternion upperBindRot, lowerBindRot, handBindRot;
-        [HideInInspector] public Quaternion handFromController;
+        [HideInInspector] public Quaternion handFromController, handBindRel;
         [HideInInspector] public float lenUpper, lenLower;
     }
 
@@ -50,6 +50,9 @@ public class GorillaFinalRig : MonoBehaviour
     public Vector3 elbowHint = new Vector3(0.6f, -1f, -0.5f);
     [Range(0f, 1f), Tooltip("Какая доля скрутки кисти передаётся предплечью (иначе вся скрутка в запястье — «фантик»)")]
     public float forearmTwist = 0.6f;
+    [Tooltip("Правая кисть = точное зеркальное отражение левой (модель симметрична, а оси костей правой кисти " +
+             "в риге Tripo перекручены). Настраивается только Rotation Offset левой руки.")]
+    public bool mirrorRightFromLeft = true;
 
     Quaternion headBind;
     bool init;
@@ -75,7 +78,8 @@ public class GorillaFinalRig : MonoBehaviour
             l.lenLower = Vector3.Distance(l.lower.position, l.hand.position);
             // В T-позе: контроллер смотрит вдоль руки наружу, ладонь вниз
             Quaternion neutral = Quaternion.Euler(0f, 90f * l.side, 0f) * Quaternion.Euler(0f, 0f, 90f * l.side);
-            l.handFromController = Quaternion.Inverse(neutral) * (rootInv * l.hand.rotation);
+            l.handBindRel = rootInv * l.hand.rotation;
+            l.handFromController = Quaternion.Inverse(neutral) * l.handBindRel;
         }
         init = true;
     }
@@ -98,6 +102,9 @@ public class GorillaFinalRig : MonoBehaviour
         Solve(right);
     }
 
+    /// Отражение поворота через плоскость YZ (лево ↔ право в осях корня).
+    static Quaternion MirrorX(Quaternion q) => new Quaternion(q.x, -q.y, -q.z, q.w);
+
     void Solve(Limb l)
     {
         if (!l.upper || !l.lower || !l.hand || !l.target) return;
@@ -109,7 +116,18 @@ public class GorillaFinalRig : MonoBehaviour
 
         // 2) поворот кисти = поворот контроллера
         var rotSrc = l.rotationSource ? l.rotationSource : l.target;
-        Quaternion handRot = rotSrc.rotation * Quaternion.Euler(l.rotationOffset) * l.handFromController;
+        Quaternion handRot;
+        if (mirrorRightFromLeft && l == right && left.hand)
+        {
+            // зеркалим контроллер через плоскость тела → считаем, как повернулась бы ЛЕВАЯ кисть →
+            // отражаем её поворот (относительно T-позы) обратно на правую сторону
+            Quaternion root = transform.rotation;
+            Quaternion ctrlRel = Quaternion.Inverse(root) * rotSrc.rotation;
+            Quaternion leftRel = MirrorX(ctrlRel) * Quaternion.Euler(left.rotationOffset) * left.handFromController;
+            Quaternion deltaL = leftRel * Quaternion.Inverse(left.handBindRel);
+            handRot = root * (MirrorX(deltaL) * right.handBindRel);
+        }
+        else handRot = rotSrc.rotation * Quaternion.Euler(l.rotationOffset) * l.handFromController;
         // кость кисти направлена вдоль своей оси Y → запястье чуть позади центра ладони
         Vector3 wrist = l.target.position - handRot * Vector3.up * l.palmOffset;
 

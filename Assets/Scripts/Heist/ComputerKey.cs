@@ -20,11 +20,11 @@ public class ComputerKey : MonoBehaviour, IPressable
 
     void OnTriggerEnter(Collider other)
     {
-        var hand = other.GetComponent<VRGrabber>();
-        if (hand == null || hand.input == VRGrabber.GrabInput.Mouse || computer == null) return;
-        bool left = hand.input == VRGrabber.GrabInput.LeftHandTrigger;
-        if (computer.TryPressFromHand(this, left))
-            GorillaHandFeedback.SendHaptic(left, 0.35f, 0.035f);
+        // нажимает только кончик указательного пальца (ComputerKeyTrigger), не вся ладонь
+        var tip = other.GetComponent<ComputerKeyTrigger>();
+        if (tip == null || computer == null) return;
+        if (computer.TryPressFromHand(this, tip.isLeft))
+            GorillaHandFeedback.SendHaptic(tip.isLeft, 0.35f, 0.035f);
     }
 
     public bool Press() => computer != null && computer.TryPressFromHand(this, null);
