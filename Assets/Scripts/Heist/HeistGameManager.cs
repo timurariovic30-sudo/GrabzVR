@@ -121,7 +121,7 @@ public class HeistGameManager : MonoBehaviour
         State = RoundState.Playing;
         TimeLeft = roundDuration;
         if (airlock) airlock.Open();
-        Announce("ПОЕХАЛИ! ШЛЮЗ ОТКРЫТ");
+        Announce(airlock ? "ПОЕХАЛИ! ШЛЮЗ ОТКРЫТ" : "ПОЕХАЛИ! ОГРАБЛЕНИЕ НАЧАЛОСЬ");
     }
 
     public void AddLoot(LootItem item) => AddLoot(item.value, item.itemName);

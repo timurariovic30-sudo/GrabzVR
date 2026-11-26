@@ -39,7 +39,7 @@ public class EvacuationZone : MonoBehaviour
         var gm = HeistGameManager.Instance;
         if (gm == null || !gm.IsPlaying)
         {
-            if (gm != null) gm.PostEvent("СНАЧАЛА НАЖМИ «СТАРТ»!");
+            if (gm != null) gm.PostEvent("ОГРАБЛЕНИЕ ЕЩЁ НЕ НАЧАЛОСЬ!");
             return;
         }
 

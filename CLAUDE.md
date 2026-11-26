@@ -9,7 +9,7 @@
 | Индекс | Сцена | Назначение |
 |---|---|---|
 | 0 | `Assets/Scenes/MainHub.unity` | Главный хаб: зеркало, выбор цвета шерсти (`SkinButton`), стол режимов, фургон-портал (`VanPortal`), ретро-компьютер GRABZ OS (`GrabzComputer`), баскетбол |
-| 1 | `Assets/Scenes/HeistLevel_Test.unity` | Карта ограбления: лут, лазеры, камеры, витрины, шлюз, табло, зона эвакуации в гараже |
+| 1 | `Assets/Scenes/HeistLevel_Test.unity` | Банк: ночная улица с фургоном грабителей, фасад, операционный зал, галерея, офисы, хранилище за сетевой бронедверью, гараж с броневиком (зона сдачи лута) |
 | — | `Assets/Scenes/SampleScene.unity` | **Не трогать.** В Build Settings выключена |
 
 `GameSession.HubScene` / `GameSession.HeistScene` задают имена сцен. Сцены в Build Settings ищутся по имени (`FusionNetworkManager.LoadSceneSynced`).
@@ -57,14 +57,19 @@
   - маска «изнутри» включается для каждой камеры отдельно (`BusPortal`, `beginCameraRendering`).
 - **Post-Processing:** глобальный Volume `HubPostFX` с профилем `Assets/Settings/HubPostFXProfile.asset` (Bloom в четверть разрешения + лёгкая цветокоррекция). Включён только на камерах игроков в MainHub.
 
-## Визуал карты Банка (HeistLevel_Test)
-- **Апгрейд поверх сцены:** `Tools/Heist/Bank/Visual Overhaul` (`BankVisualOverhaul`). Идемпотентный: пересоздаёт только корень сцены `BankDecor`, перетекстурирует архитектуру зон `HeistMap/Z*/Static` и точечно правит свет, старую дверь хранилища, стойку ресепшена и фургон (прячет их, сетевые объекты не удаляет). `HeistMapBuilder` не вызывает. Превью: `Tools/Heist/Bank/Capture Preview` → `HubPreview/Bank_*.png`.
-- **Всё новое для Банка — в отдельных папках:** материалы, текстуры (`Textures/`) и профиль Post-FX в `Assets/Art/Materials/Bank/` (`M_Bank_*`), Tripo-модели, UV-меши и префаб лута в `Assets/Art/GeneratedModels/Bank/`. Общие `M_*.mat` не менять.
-- **Текстуры по зонам** (`BankRetroTextures`, 256 px, ковролин и краска 128): мрамор с трещинами и известняк в Холле, обои и деревянные панели с ковролином в Офисах, бронеплиты и рифлёный пол в Хранилище, асфальт, бетон опалубки и жёлтая разметка в Гараже, паркет и штукатурка в Галерее. С «чужой» стороны общих стен лежит тонкая облицовка (`BankDecor/Static/Cladding`).
-- **Tripo:** `Bank_VaultDoor`, `Bank_ReceptionDesk`, `Bank_GetawayTruck`, `Bank_GoldenStatue`.
-- **Золотая статуя основателя** — сетевой лут `Loot_GoldenStatue` ($1500, тяжёлый, `GoldenStatue`) на постаменте в центре Галереи. Сетевые компоненты такие же, как у остального лута.
-- **Эвакуация:** вместо фургона стоит броневик. Зона сдачи `EvacZone_VanCargo` перенесена к его задним дверям (на площадку с надписью «ЛУТ СЮДА»), кузов закрыт.
-- **Свет:** тёплый Холл, холодная Галерея, сине-красное Хранилище и Гараж. Добавлен только один новый источник (`StatueSpot`), остальное — перекраска существующих ламп и светящиеся полосы-меши. Volume `BankPostFX` (Bloom в четверть разрешения, лёгкая цветокоррекция), постобработка включена у камер игроков в этой сцене.
+## Карта Банка (HeistLevel_Test)
+- **Апгрейд поверх сцены:** `Tools/Heist/Bank/Visual Overhaul` (`BankVisualOverhaul`, partial: `BankExterior`, `BankInteriorProps`). Идемпотентный: пересоздаёт корень сцены `BankDecor`, перетекстурирует архитектуру `HeistMap/Z*/Static`, прячет (не удаляет) заменённые примитивы. `HeistMapBuilder` не вызывает. Превью: `Tools/Heist/Bank/Capture Preview` → `HubPreview/Bank_*.png`.
+- **Папки Банка:** скрипты `Assets/Scripts/Bank/` (editor — в `Assets/Scripts/Bank/Editor/`), материалы, текстуры и профиль Post-FX `Assets/Art/Materials/Bank/` (`M_Bank_*`), Tripo-модели, UV-меши и префаб лута `Assets/Art/GeneratedModels/Bank/`. Общие `M_*.mat` не менять.
+- **Старт ограбления:** тестового Убежища со шлюзом и пультом больше нет (`Z1_Hub_Bunker` спрятан). Игроки появляются в кузове фургона `GetawayVan_Arrival` у ступенек Банка.
+  - `NetworkHeistStartTrigger` — объект сцены, Master Client Object. Каждый клиент следит за своим игроком; вышел из кузова — RPC хосту.
+  - Хост ставит `[Networked] IsHeistStarted`, когда вышла вся команда или через 10 с после первого вышедшего, и вызывает `HeistGameManager.StartHeist()`.
+  - У всех синхронно: двери захлопываются, двигатель газует, фургон уезжает за угол и прячется. Кто остался в кузове — переносится на тротуар.
+- **Дверь хранилища** `VaultDoor_Net` (`NetworkVaultDoor`, Master Client Object, `[Networked] IsOpen` + таймер взлома): кнопка «ВЗЛОМ» в Холле — 5 с взлома, кнопка «ДВЕРЬ» внутри — сразу. Старая решётка `VaultGate` (локальная `SlidingDoor`) спрятана.
+- **Улица:** тротуар, бордюр, асфальт с разметкой, дома напротив с окнами и неоном, фонари, гидранты, урны, газетные автоматы. Фасад с портиком, 6 колоннами (по кольцам можно залезть), лестницей и неоновой вывеской GRABZ BANK (TextMeshPro с HDR-материалом `M_Bank_Neon*`). Невидимая граница бокового переулка — слой Ignore Raycast.
+- **Tripo** (`Assets/Art/GeneratedModels/Bank/Bank_*.glb`): VaultDoor, GoldenStatue, ReceptionDesk, GetawayTruck, SecurityCamera, IronBars, ATM, TellerCounter, OfficeDesk, PottedPlant, LeatherBench, StreetLamp, FireHydrant, TrashCan, NewsBox. У мебели — MeshCollider на слое Default. Камеры видеонаблюдения: модель внутри поворотной части `SecurityCamera`, без коллайдеров (не закрывает луч обзора); тревога работает через `AlarmSystem`, как раньше.
+- **Текстуры по зонам** (`BankRetroTextures`, 256 px, ковролин и краска 128): мрамор, известняк, обои, деревянные панели, ковролин, бронеплиты, рифлёный пол, асфальт, бетон опалубки, тротуарная плитка, паркет, штукатурка. С «чужой» стороны общих стен — облицовка `BankDecor/Static/Cladding`.
+- **Лут:** золотая статуя основателя `Loot_GoldenStatue` ($1500, тяжёлая) в Галерее, сетевые компоненты как у остального лута. **Эвакуация:** броневик в гараже, зона сдачи у его задних дверей.
+- **Свет:** ночное небо (`M_Bank_NightSky`), тёплые фонари, холодный операционный зал, приглушённое золото в хранилище, красная сирена (`AlarmSystem`). Новых источников 8: 4 фонаря, 2 фары и плафон фургона (гаснут, когда он уезжает), прожектор статуи. Volume `BankPostFX` (Bloom в четверть разрешения + цветокоррекция) на камерах игроков в этой сцене.
 
 ## Сеть (Fusion 2 Shared)
 - `FusionNetworkManager` (в обеих сценах, DontDestroyOnLoad): автовход в комнату `GRABZ_TEST` или по коду из GRABZ OS → ROOM. Режимы микрофона: ALL CHAT / PUSH TO TALK / PUSH TO MUTE. Смена сцены общая для всей комнаты.

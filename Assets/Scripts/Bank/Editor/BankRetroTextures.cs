@@ -334,7 +334,30 @@ public static class BankRetroTextures
         c.a = 1;
     }
 
+    // ------------------------------------------------------------------ тротуарная плитка
+    /// Квадратные бетонные плиты 2×2 (по 128 px): швы, сколы, пятна жвачки и грязь, тёплый оттенок от фонарей.
+    static void Pavement(int x, int y, out Color c, out float h)
+    {
+        const int S = 256, P = 128;
+        float u = x / (float)S, v = y / (float)S;
+        int lx = x % P, ly = y % P, slab = (x / P) + (y / P) * 2;
+        float n = Fbm(u, v, 8, 4, 301);
+        c = new Color(0.46f, 0.45f, 0.43f) * (0.82f + 0.25f * n + 0.06f * Hash(slab, 0, 303));
+        h = 0.6f + 0.15f * n;
+        float sp = Hash(x, y, 307);
+        if (sp < 0.03f) c *= 0.75f;
+        float gum = Hash(x / 6, y / 6, 311);
+        if (gum > 0.985f && Hash(x, y, 313) > 0.3f) { c = new Color(0.22f, 0.21f, 0.2f); h = 0.65f; }  // пятна жвачки
+        float dirt = Fbm(u, v, 2, 3, 317);
+        c *= 1f - 0.25f * Mathf.Clamp01((dirt - 0.55f) * 3f);
+        int d = Mathf.Min(Mathf.Min(lx, P - 1 - lx), Mathf.Min(ly, P - 1 - ly));
+        if (d < 2) { c *= 0.5f; h = 0.15f; }
+        else if (d < 4 && Fbm(u, v, 32, 2, 319) > 0.62f) { c *= 0.7f; h = 0.35f; }       // сколы у краёв
+        c.a = 1;
+    }
+
     // ------------------------------------------------------------------ публичное API
+    public static (Texture2D, Texture2D) Pavement() => Make("Pavement", 256, Pavement, 2f);
     public static (Texture2D, Texture2D) MarbleLight()
     {
         marbleA = new Color(0.86f, 0.84f, 0.80f); marbleB = new Color(0.95f, 0.94f, 0.91f); marbleVein = new Color(0.45f, 0.44f, 0.46f);
