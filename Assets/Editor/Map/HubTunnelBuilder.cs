@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -52,7 +52,7 @@ public static class HubTunnelBuilder
                 go.transform.SetParent(pieces, false);
                 go.transform.position = new Vector3((x0 + x1) / 2f, (y0 + y1) / 2f, wb.center.z);
                 go.transform.localScale = size;
-                go.layer = layer;
+                go.layer = 0;   // обычный слой: стена видна и сквозь стеклянные стены салона
                 go.AddComponent<MeshFilter>().sharedMesh = HubVisualOverhaul.BoxMesh(size, 1.6f);
                 var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = brick; r.shadowCastingMode = ShadowCastingMode.Off;
             }

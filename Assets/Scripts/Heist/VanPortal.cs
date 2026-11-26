@@ -42,7 +42,7 @@ public class VanPortal : MonoBehaviour
         bool inside = Mathf.Abs(local.x) <= half.x && Mathf.Abs(local.y) <= half.y && Mathf.Abs(local.z) <= half.z;
 
         if (inside && running == null) running = StartCoroutine(Countdown());
-        else if (!inside && running != null)
+        else if (!inside && running != null && !(bus && bus.IsDriving))   // автобус уже едет (и везёт салон) — не отменяем
         {
             StopCoroutine(running);
             running = null;

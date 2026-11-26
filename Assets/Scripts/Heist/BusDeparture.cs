@@ -1,16 +1,17 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
 /// Анимация отправки чёрного автобуса в тоннель (вызывает VanPortal):
 ///  1) Board(): задняя сдвижная дверь закрывается, включаются холодные LED-фары и объёмные лучи,
 ///     кузов мелко дрожит на холостом ходу (звук запуска двигателя играет VanPortal);
-///  2) DriveOff(): автобус плавно трогается и уезжает в тёмный тоннель (вперёд по +Z).
+///  2) DriveOff(): автобус целиком (кузов + салон + коллайдеры) плавно трогается и въезжает в тёмный
+///     тоннель (вперёд по +Z); свой игрок в салоне едет вместе с ним — экипаж видит дорогу сквозь
+///     стеклянную кабину и свет фар в тоннеле;
 ///  Cancel(): игрок вышел из салона во время отсчёта — дверь открывается, фары гаснут.
-///
-/// Двигается только внешний кузов (Exterior + дверь + фары). Салон и его коллайдеры остаются на месте:
-/// игроки внутри не «выпадают», а снаружи салона не видно — после закрытия двери маска проёма выключена,
-/// а изнутри проём закрывает внутренняя дверь (слои BusPortal/BusInterior).
+/// Приборная панель кабины (сапфировая подсветка, полоса скорости) оживает при запуске и на ходу.
+/// Снаружи салона не видно: после закрытия двери маска проёма выключена, изнутри проём закрывает
+/// внутренняя дверь (слои BusPortal/BusInterior).
 /// </summary>
 public class BusDeparture : MonoBehaviour
 {
@@ -31,15 +32,30 @@ public class BusDeparture : MonoBehaviour
     public float driveDistance = 48f;
     public float driveTime = 4.2f;
     public float idleShake = 0.006f;
+    [Header("Кабина водителя")]
+    public Renderer[] dashGlow;        // контур панели, «контур пути», ступица руля
+    public Renderer[] speedBar;        // сегменты полосы скорости
+    public Color dashColor = new Color(0.04f, 0.31f, 0.82f);
+    [Header("Тоннель")]
+    [Tooltip("Слои тумана: гаснут, пока салон проезжает сквозь них")]
+    public Renderer[] fogLayers;
+    public BusPortal portal;
 
-    Vector3 exteriorHome;
+    Vector3 exteriorHome, rootHome;
     bool boarded, driving;
+    float speed01;
+    MaterialPropertyBlock mpb;
+    PlayerModeSwitcher switcher;
+
+    public bool IsDriving => driving;
     Coroutine doorAnim;
     float lightLevel;
 
     void Awake()
     {
         if (exterior) exteriorHome = exterior.localPosition;
+        rootHome = transform.position;
+        switcher = FindAnyObjectByType<PlayerModeSwitcher>();
         SetLights(0f);
         if (innerDoor) innerDoor.SetActive(false);
         if (outerDoor) { outerDoor.localPosition = doorOpenLocal; outerDoor.localScale = doorOpenScale; }
@@ -93,6 +109,7 @@ public class BusDeparture : MonoBehaviour
             float t = Time.time * 23f;
             exterior.localPosition = exteriorHome + new Vector3(Mathf.Sin(t * 1.3f) * 0.4f, Mathf.Sin(t), Mathf.Sin(t * 0.7f) * 0.3f) * idleShake;
         }
+        UpdateDash();
     }
 
     void SetLights(float k)
@@ -103,23 +120,84 @@ public class BusDeparture : MonoBehaviour
         if (ledStrips != null) foreach (var s in ledStrips) if (s) s.enabled = k > 0.01f;
     }
 
-    /// Автобус трогается и уезжает в тоннель (плавный разгон, лёгкое покачивание).
+    /// Тусклая сапфировая приборка: в покое едва светится, при запуске двигателя оживает,
+    /// на ходу полоса скорости заполняется по мере разгона.
+    void UpdateDash()
+    {
+        mpb ??= new MaterialPropertyBlock();
+        float glow = 0.12f + 0.88f * lightLevel;
+        if (dashGlow != null)
+            foreach (var r in dashGlow) if (r) { mpb.SetColor("_BaseColor", dashColor * glow * (1f + 0.15f * Mathf.Sin(Time.time * 3f) * lightLevel)); r.SetPropertyBlock(mpb); }
+        if (speedBar != null)
+            for (int i = 0; i < speedBar.Length; i++)
+            {
+                if (!speedBar[i]) continue;
+                bool lit = (i + 0.5f) / speedBar.Length < speed01;
+                mpb.SetColor("_BaseColor", dashColor * (lit ? 1.6f : 0.1f * glow));
+                speedBar[i].SetPropertyBlock(mpb);
+            }
+    }
+
+    /// Автобус трогается и въезжает в тоннель целиком (плавный разгон, лёгкое покачивание кузова);
+    /// свой игрок в салоне переносится вместе с автобусом каждый кадр.
     public IEnumerator DriveOff()
     {
-        if (!exterior) yield break;
         driving = true;
         Board();
+        rootHome = transform.position;
         float t = 0;
         while (t < driveTime)
         {
             t += Time.deltaTime;
-            float k = t / driveTime;
-            float dist = driveDistance * k * k;                       // равноускоренно
-            float sway = Mathf.Sin(t * 7f) * 0.008f * (1f - k);
-            exterior.localPosition = exteriorHome + new Vector3(0, sway, dist);
-            exterior.localRotation = Quaternion.Euler(-0.6f * Mathf.Clamp01(t * 2f) * (1f - k), 0, sway * 40f);
+            float k = Mathf.Clamp01(t / driveTime);
+            speed01 = k;
+            Vector3 next = rootHome + transform.forward * (driveDistance * k * k);   // равноускоренно
+            Vector3 delta = next - transform.position;
+            bool carry = IsLocalPlayerInside();
+            transform.position = next;
+            if (carry) CarryLocalPlayer(delta);
+            if (exterior)
+            {
+                float sway = Mathf.Sin(t * 7f) * 0.008f * (1f - k);
+                exterior.localPosition = exteriorHome + new Vector3(0, sway, 0);
+                exterior.localRotation = Quaternion.Euler(-0.6f * Mathf.Clamp01(t * 2f) * (1f - k), 0, sway * 40f);
+            }
+            HideFogInsideSalon();
             yield return null;
         }
+    }
+
+    bool IsLocalPlayerInside()
+    {
+        if (!switcher) switcher = FindAnyObjectByType<PlayerModeSwitcher>();
+        return switcher && portal && portal.IsInsideWorld(switcher.ActivePlayerPosition() + Vector3.up * 0.5f);
+    }
+
+    /// Переносит своего игрока (VR — GorillaLocomotion, ПК — CharacterController) на смещение автобуса.
+    void CarryLocalPlayer(Vector3 delta)
+    {
+        bool vr = switcher.Current == PlayerModeSwitcher.Mode.VR || switcher.Current == PlayerModeSwitcher.Mode.VRSimulator;
+        if (vr && GorillaLocomotion.Player.Instance != null)
+        {
+            var gp = GorillaLocomotion.Player.Instance;
+            var head = gp.headCollider.transform;
+            var pos = new Vector3(head.position.x + delta.x, gp.transform.position.y + delta.y, head.position.z + delta.z);
+            switcher.TeleportActive(pos, head.eulerAngles.y);
+        }
+        else
+        {
+            var dp = FindAnyObjectByType<DesktopTestPlayer>();
+            if (dp) switcher.TeleportActive(dp.transform.position + delta, dp.transform.eulerAngles.y);
+        }
+    }
+
+    /// Слои «тумана» тоннеля — это плоскости поперёк тоннеля: пока салон едет сквозь них, прячем их.
+    void HideFogInsideSalon()
+    {
+        if (fogLayers == null || !portal) return;
+        foreach (var f in fogLayers)
+            if (f) f.enabled = !portal.IsInsideWorld(new Vector3(transform.position.x, transform.position.y + 1.2f, f.transform.position.z)) &&
+                               transform.InverseTransformPoint(f.transform.position).z > portal.interiorEndZ + 0.3f;
     }
 
     void OnDisable()

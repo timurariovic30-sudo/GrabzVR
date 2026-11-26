@@ -42,8 +42,10 @@ public static class BlackBusBuilder
     const float Rb = 0.12f;               // радиус скругления продольных рёбер
     const float Bottom = 0.2f;            // клиренс (низ кузова = пол салона − Rb)
     const float RearZ = -L / 2f, FrontZ = L / 2f;
-    const float FloorY = Bottom + Rb, CeilY = 2.43f, InHalfW = 1.5f;    // пол салона 0.32; салон на 20% шире прежнего (1.25)
-    const float InteriorLen = L * 1.7f;   // 10.88 м
+    const float FloorY = Bottom + Rb, CeilY = 2.43f, InHalfW = 1.725f;  // пол салона 0.32; ширина 1.25 → ×1.2 → ×1.15 = 3.45 м
+    const float InteriorLen = L * 1.7f * 1.1f;   // салон в 1.87 раза длиннее кузова (+10%): 10.47 м
+    const float CabinDepth = 1.8f;               // стеклянная кабина водителя в носу салона
+    static float CabinZ => InteriorEndZ - CabinDepth;
     static float DoorZ = RearZ;           // плоскость проёма в корме (по поверхности модели)
     static float InteriorEndZ => DoorZ + InteriorLen;
     const float DoorHalfW = 0.65f, DoorTopY = 2.32f;   // просвет 2.0 м: проходит и ПК-игрок (CharacterController 1.8 м)
@@ -85,8 +87,11 @@ public static class BlackBusBuilder
         BuildMaterials();
 
         var scene = EditorSceneManager.OpenScene(HubPath, OpenSceneMode.Single);
-        foreach (var g in scene.GetRootGameObjects().Where(g => g.name == RootName).ToArray()) Object.DestroyImmediate(g);
         var map = scene.GetRootGameObjects().FirstOrDefault(g => g.name == "MainHubMap");
+        var oldVp = map ? map.GetComponentsInChildren<VanPortal>(true).FirstOrDefault() : null;
+        if (oldVp && oldVp.countdownText && oldVp.countdownText.transform.root.name == RootName)
+            oldVp.countdownText.transform.SetParent(map.transform.Find("Dynamic"), true);   // табло живёт в автобусе — вынести до пересборки
+        foreach (var g in scene.GetRootGameObjects().Where(g => g.name == RootName).ToArray()) Object.DestroyImmediate(g);
         if (!map) { log.AppendLine("ERROR: MainHubMap not found"); return log.ToString(); }
 
         // старый джип
@@ -111,6 +116,9 @@ public static class BlackBusBuilder
         FixVanPortal(map.transform, root);
         FixVanDecor(scene, root);
         log.AppendLine(HubTunnelBuilder.Build(map.transform, root, InteriorEndZ, H, InHalfW + 0.14f));
+        var depart = root.GetComponent<BusDeparture>();
+        var fogRoot = scene.GetRootGameObjects().FirstOrDefault(g => g.name == HubTunnelBuilder.RootName)?.transform.Find("Fog");
+        if (depart && fogRoot) depart.fogLayers = fogRoot.GetComponentsInChildren<Renderer>(true);
 
         EditorSceneManager.MarkSceneDirty(scene);
         if (!EditorSceneManager.SaveScene(scene)) log.AppendLine("ERROR: save failed");
@@ -149,6 +157,8 @@ public static class BlackBusBuilder
             Feature(data, "Bus 3 Exterior", RenderPassEvent.AfterRenderingOpaques, 1 << lExt, CompareFunction.NotEqual);
             // прозрачное в салоне (табло отсчёта, ники горилл внутри) — тоже только сквозь проём и изнутри
             Feature(data, "Bus 4 Interior Transparent", RenderPassEvent.AfterRenderingTransparents, 1 << lInt, CompareFunction.Equal, RenderQueueType.Transparent);
+            // прозрачное снаружи кузова (лучи фар) — не видно изнутри салона (нос кузова «внутри» длинного салона)
+            Feature(data, "Bus 5 Exterior Transparent", RenderPassEvent.AfterRenderingTransparents, 1 << lExt, CompareFunction.NotEqual, RenderQueueType.Transparent);
             data.SetDirty();
             EditorUtility.SetDirty(data);
             log.AppendLine($"  renderer {System.IO.Path.GetFileNameWithoutExtension(path)}: features = {string.Join(", ", data.rendererFeatures.Where(f => f).Select(f => f.name))}");
@@ -575,9 +585,9 @@ public static class BlackBusBuilder
         return best;
     }
 
-    static Mesh SaveMesh(Mesh mesh)
+    static Mesh SaveMesh(Mesh mesh, string dir = null)
     {
-        string path = $"{MeshDir}/{mesh.name}.asset";
+        string path = $"{dir ?? MeshDir}/{mesh.name}.asset";
         var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
         if (existing)
         {
@@ -922,17 +932,24 @@ public static class BlackBusBuilder
             var p = led.transform.localPosition;
             var lgo = new GameObject("Headlight");
             lgo.transform.SetParent(ext, false);
-            lgo.transform.localPosition = new Vector3(p.x, hy, p.z + 0.05f);
+            // источник света — сразу за лобовым стеклом кабины (нос кузова находится внутри длинного салона:
+            // фара там давала бы блики на стекле кабины); объёмный луч остаётся у фары кузова (виден только снаружи)
+            lgo.transform.localPosition = new Vector3(p.x, hy, InteriorEndZ + 0.25f);
             lgo.transform.localRotation = Quaternion.Euler(4f, 0, 0);
             var l = lgo.AddComponent<Light>();
             l.type = LightType.Spot; l.color = new Color(0.82f, 0.9f, 1f); l.range = 34f; l.spotAngle = 52f; l.innerSpotAngle = 20f;
             l.shadows = LightShadows.None; l.intensity = 0f; l.enabled = false;
+            l.cullingMask = ~(1 << lInt);   // светят в тоннель, но не в салон/кабину (нос кузова — внутри длинного салона)
             lights.Add(l);
-            var beam = Part(lgo.transform, "LightBeam", beamMesh, beamMat, 0, false);
+            var beam = Part(ext, "LightBeam", beamMesh, beamMat, lExt, false);
+            beam.transform.localPosition = new Vector3(p.x, hy, p.z + 0.05f);
+            beam.transform.localRotation = Quaternion.Euler(4f, 0, 0);
             beam.GetComponent<Renderer>().enabled = false;
             beams.Add(beam.GetComponent<Renderer>());
         }
         dep.headlights = lights.ToArray(); dep.beams = beams.ToArray(); dep.ledStrips = headlightLeds;
+        dep.portal = root.GetComponent<BusPortal>();
+        dep.dashGlow = dashGlow; dep.speedBar = speedBar; dep.dashColor = Sapphire * 1.4f;
         foreach (var r in headlightLeds) r.enabled = false;
         log.AppendLine("  departure: rear shutter, inner door, 2 headlights + beams");
     }
@@ -1002,14 +1019,17 @@ public static class BlackBusBuilder
     }
 
     /// Коробка салона гранями внутрь: пол (submesh 0), стены/потолок/торцы (submesh 1 или 0, если single).
-    static void Shell(MB mb, float z0, float z1, bool rear, bool far, bool single)
+    static void Shell(MB mb, float z0, float z1, bool rear, bool far, bool single, bool sides = true)
     {
         int walls = single ? 0 : 1;
         float hw = InHalfW, len = z1 - z0, h = CeilY - FloorY;
         mb.Quad(new Vector3(-hw, FloorY, z0), Vector3.right * 2 * hw, Vector3.forward * len, Vector3.up, 0);
         mb.Quad(new Vector3(-hw, CeilY, z0), Vector3.right * 2 * hw, Vector3.forward * len, Vector3.down, walls);
-        mb.Quad(new Vector3(-hw, FloorY, z0), Vector3.forward * len, Vector3.up * h, Vector3.right, walls);
-        mb.Quad(new Vector3(hw, FloorY, z0), Vector3.forward * len, Vector3.up * h, Vector3.left, walls);
+        if (sides)
+        {
+            mb.Quad(new Vector3(-hw, FloorY, z0), Vector3.forward * len, Vector3.up * h, Vector3.right, walls);
+            mb.Quad(new Vector3(hw, FloorY, z0), Vector3.forward * len, Vector3.up * h, Vector3.left, walls);
+        }
         if (far) mb.Quad(new Vector3(-hw, FloorY, z1), Vector3.right * 2 * hw, Vector3.up * h, Vector3.back, walls);
         if (rear)
         {
@@ -1029,7 +1049,7 @@ public static class BlackBusBuilder
         for (int s = 0; s < 3; s++)
         {
             var mb = new MB(2);
-            Shell(mb, zs[s], zs[s + 1], s == 0, s == 2, false);
+            Shell(mb, zs[s], zs[s + 1], s == 0, false, false, sides: false);   // бока и нос — смарт-стекло (BuildSmartGlass)
             var go = Part(inside, $"Shell_{s}", SaveMesh(mb.Build($"Bus_InteriorShell_{s}")), mFloor, lInt, false);
             var r = go.GetComponent<MeshRenderer>();
             r.sharedMaterials = new[] { mFloor, mWall };
@@ -1059,14 +1079,16 @@ public static class BlackBusBuilder
         // мягкий синий свет: только салон и игроки (на соседний пол хаба не «протекает»)
         int mask = (1 << lInt) | (1 << LayerMask.NameToLayer("Player")) | (1 << LayerMask.NameToLayer("LocalHead"));
         int li = 0;
-        foreach (float lz in new[] { -1.9f, 0.9f, 3.7f, 6.5f })
+        foreach (float lz in Enumerable.Range(0, 4).Select(i => Mathf.Lerp(DoorZ + 1.2f, CabinZ - 0.6f, i / 3f)))
         {
             var l = MapKit.PointLight(inside, $"BlueLight_{li++}", new Vector3(0, CeilY - 0.3f, lz), LightCobalt, LightIntensity, 3.4f);
             l.cullingMask = mask;
             l.renderMode = LightRenderMode.Auto;
         }
 
-        // надпись-табло на передней стенке салона (туда переезжает отсчёт VanPortal)
+        BuildSmartGlass(inside, lInt);
+        BuildCabin(inside, lInt);
+
         // маски Stencil
         var masks = new GameObject("PortalMasks").transform;
         masks.SetParent(root, false);
@@ -1079,6 +1101,230 @@ public static class BlackBusBuilder
         im.receiveShadows = false;
         return im;
     }
+
+    // =========================================================================== смарт-стекло (Hub)
+    const string HubMatDir = "Assets/Art/Materials/Hub";
+    const string HubTexDir = "Assets/Art/Textures/Hub";
+    const string HubMeshDir = "Assets/Art/Meshes/Hub";
+    static Material mGlassWall, mGlassCabin, mFrame, mDashGlow, mDashBody;
+    public static readonly Color Sapphire = new Color32(0x07, 0x35, 0x8C, 0xFF);
+
+    /// Одностороннее тактическое смарт-стекло: бока салона и кабины прозрачны только изнутри
+    /// (снаружи кузов глухой — стекло на слое салона, видно лишь сквозь Stencil). Неподвижный силовой
+    /// каркас (матово-чёрные стойки с тёмно-синей LED-окантовкой) и микро-штрихи по краям каждой панели —
+    /// статичный визуальный якорь для глаз в VR, против укачивания.
+    static void BuildSmartGlass(Transform inside, int lInt)
+    {
+        HubMaterials();
+        var g = new GameObject("SmartGlass").transform;
+        g.SetParent(inside, false);
+        float hw = InHalfW, h = CeilY - FloorY;
+        // стойки каркаса ~ каждые 1.3 м, панели между ними (UV 0..1 — штрихи по краям каждой панели)
+        int bays = Mathf.Max(2, Mathf.RoundToInt((CabinZ - DoorZ) / 1.3f));
+        var zs = Enumerable.Range(0, bays + 1).Select(i => Mathf.Lerp(DoorZ, CabinZ, i / (float)bays)).ToList();
+        zs.Add(InteriorEndZ);   // последняя секция — бок кабины водителя
+        var mb = new MB(1);
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            for (int i = 0; i < zs.Count - 1; i++)
+            {
+                float z0 = zs[i] + 0.03f, z1 = zs[i + 1] - 0.03f;
+                PanelQuad(mb, new Vector3(sx * (hw - 0.005f), FloorY + 0.06f, z0), Vector3.forward * (z1 - z0), Vector3.up * (h - 0.12f), new Vector3(-sx, 0, 0));
+            }
+            foreach (float z in zs) Post(g, new Vector3(sx * (hw - 0.035f), FloorY + h / 2f, z), new Vector3(0.07f, h, 0.06f), lInt, ledOnSide: -sx);
+            // рейки сверху и снизу по всей длине
+            Rail(g, new Vector3(sx * (hw - 0.035f), CeilY - 0.03f, (DoorZ + InteriorEndZ) / 2f), new Vector3(0.07f, 0.06f, InteriorEndZ - DoorZ), lInt);
+            Rail(g, new Vector3(sx * (hw - 0.035f), FloorY + 0.03f, (DoorZ + InteriorEndZ) / 2f), new Vector3(0.07f, 0.06f, InteriorEndZ - DoorZ), lInt);
+        }
+        var go = Part(g, "GlassWalls", SaveMeshTo(mb.Build("Hub_Bus_SmartGlassWalls"), HubMeshDir), mGlassWall, lInt, false);
+        go.GetComponent<Renderer>().receiveShadows = false;
+        log.AppendLine($"  smart glass: {bays + 1} bays per side, posts every {(CabinZ - DoorZ) / bays:F2} m");
+    }
+
+    static void PanelQuad(MB mb, Vector3 p0, Vector3 a, Vector3 b, Vector3 normal)
+    {
+        int i = mb.v.Count;
+        mb.Quad(p0, a, b, normal, 0);
+        // UV 0..1 на панель (для штрихов и градиента по краям)
+        mb.uv[i] = new Vector2(0, 0); mb.uv[i + 1] = new Vector2(1, 0); mb.uv[i + 2] = new Vector2(1, 1); mb.uv[i + 3] = new Vector2(0, 1);
+    }
+
+    static void Post(Transform p, Vector3 c, Vector3 size, int layer, float ledOnSide)
+    {
+        Prim(PrimitiveType.Cube, p, "FramePost", c, size, Quaternion.identity, mFrame, layer, false).GetComponent<Renderer>().receiveShadows = false;
+        // тонкая LED-окантовка на внутренней грани стойки
+        Prim(PrimitiveType.Cube, p, "FrameLED", c + new Vector3(ledOnSide * (size.x / 2f + 0.004f), 0, 0), new Vector3(0.008f, size.y - 0.1f, 0.014f), Quaternion.identity, mNeon, layer, false);
+    }
+
+    static void Rail(Transform p, Vector3 c, Vector3 size, int layer) =>
+        Prim(PrimitiveType.Cube, p, "FrameRail", c, size, Quaternion.identity, mFrame, layer, false).GetComponent<Renderer>().receiveShadows = false;
+
+    // ---- стеклянная кабина водителя
+    static Renderer[] dashGlow, speedBar;
+
+    /// Панорамная стеклянная перегородка (центр + скошенные боковины) в тёмной металлической раме,
+    /// с градиентом тонировки сверху («козырёк»); впереди — панорамное лобовое того же стекла.
+    /// Внутри — минималистичная приборная панель и руль с тусклой сапфировой подсветкой: полоса скорости
+    /// и контур пути «оживают» при запуске двигателя и выезде (BusDeparture).
+    static void BuildCabin(Transform inside, int lInt)
+    {
+        var cab = new GameObject("DriverCabin").transform;
+        cab.SetParent(inside, false);
+        float hw = InHalfW, h = CeilY - FloorY, zP = CabinZ, side = 0.55f, chamfer = 0.35f;
+        var mb = new MB(1);
+        // центр перегородки и скошенные боковины (к салону)
+        var c0 = new Vector3(-(hw - side), FloorY, zP); var c1 = new Vector3(hw - side, FloorY, zP);
+        PanelQuad(mb, c0, c1 - c0, Vector3.up * h, Vector3.back);
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            var a = new Vector3(sx * hw, FloorY, zP - chamfer); var b = new Vector3(sx * (hw - side), FloorY, zP);
+            var n = Vector3.Cross(Vector3.up, b - a).normalized * sx; if (n.z > 0) n = -n;
+            if (sx < 0) PanelQuad(mb, a, b - a, Vector3.up * h, n); else PanelQuad(mb, b, a - b, Vector3.up * h, n);
+        }
+        // панорамное лобовое в носу салона
+        PanelQuad(mb, new Vector3(-hw, FloorY, InteriorEndZ - 0.01f), Vector3.right * 2 * hw, Vector3.up * h, Vector3.back);
+        var glass = Part(cab, "CabinGlass", SaveMeshTo(mb.Build("Hub_Bus_CabinGlass"), HubMeshDir), mGlassCabin, lInt, false);
+        glass.GetComponent<Renderer>().receiveShadows = false;
+
+        // рама кабины: стойки, верхняя балка, порог; рама лобового
+        Vector3 Mid(Vector3 a, Vector3 b) => (a + b) / 2f;
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            Post(cab, new Vector3(sx * (hw - side), FloorY + h / 2f, zP - 0.02f), new Vector3(0.08f, h, 0.08f), lInt, 0);
+            Post(cab, new Vector3(sx * (hw - 0.04f), FloorY + h / 2f, InteriorEndZ - 0.04f), new Vector3(0.08f, h, 0.08f), lInt, -sx);
+        }
+        Rail(cab, new Vector3(0, CeilY - 0.05f, zP - 0.02f), new Vector3(2 * hw, 0.1f, 0.08f), lInt);
+        Rail(cab, new Vector3(0, FloorY + 0.04f, zP - 0.02f), new Vector3(2 * (hw - side), 0.08f, 0.08f), lInt);
+        Rail(cab, new Vector3(0, CeilY - 0.05f, InteriorEndZ - 0.04f), new Vector3(2 * hw, 0.1f, 0.08f), lInt);
+        Rail(cab, new Vector3(0, FloorY + 0.55f, InteriorEndZ - 0.04f), new Vector3(2 * hw, 0.06f, 0.06f), lInt);   // нижний край лобового
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            var a = new Vector3(sx * hw, CeilY - 0.05f, zP - chamfer); var b = new Vector3(sx * (hw - side), CeilY - 0.05f, zP);
+            Prim(PrimitiveType.Cube, cab, "FrameRail", Mid(a, b), new Vector3(0.08f, 0.1f, (b - a).magnitude), Quaternion.LookRotation(b - a), mFrame, lInt, false);
+        }
+
+        // приборная панель (во всю ширину, у лобового) и руль слева
+        float dz = InteriorEndZ - 0.45f, dy = FloorY + 0.85f;
+        Prim(PrimitiveType.Cube, cab, "Dashboard", new Vector3(0, FloorY + 0.42f, dz), new Vector3(2 * hw - 0.2f, 0.84f, 0.6f), Quaternion.identity, mDashBody, lInt, false);
+        var top = Prim(PrimitiveType.Cube, cab, "DashTop", new Vector3(0, dy + 0.02f, dz - 0.05f), new Vector3(2 * hw - 0.25f, 0.06f, 0.55f), Quaternion.Euler(-12, 0, 0), mDashBody, lInt, false);
+        var glow = new List<Renderer>(); var speed = new List<Renderer>();
+        // тонкий световой контур по краю панели и «контур пути» (стрелка-траектория) по центру
+        glow.Add(Prim(PrimitiveType.Cube, cab, "DashEdgeLED", new Vector3(0, dy + 0.055f, dz - 0.33f), new Vector3(2 * hw - 0.3f, 0.01f, 0.01f), Quaternion.identity, mDashGlow, lInt, false).GetComponent<Renderer>());
+        for (int i = 0; i < 6; i++)
+        {
+            float t = i / 5f;
+            var p = new Vector3(Mathf.Sin(t * 2.2f) * 0.12f, dy + 0.06f, dz - 0.2f + t * 0.32f);
+            glow.Add(Prim(PrimitiveType.Cube, cab, "PathLine", p, new Vector3(0.012f, 0.006f, 0.07f), Quaternion.Euler(-12, Mathf.Cos(t * 2.2f) * 30f, 0), mDashGlow, lInt, false).GetComponent<Renderer>());
+        }
+        // полоса скорости: 12 сегментов справа от пути
+        for (int i = 0; i < 12; i++)
+            speed.Add(Prim(PrimitiveType.Cube, cab, "SpeedSeg", new Vector3(0.32f + i * 0.045f, dy + 0.06f, dz - 0.12f), new Vector3(0.032f, 0.006f, 0.05f + i * 0.004f), Quaternion.Euler(-12, 0, 0), mDashGlow, lInt, false).GetComponent<Renderer>());
+        // руль (водительское место слева): обод из сегментов + ступица + колонка
+        var wheel = new GameObject("SteeringWheel").transform;
+        wheel.SetParent(cab, false);
+        wheel.localPosition = new Vector3(-hw + 0.75f, dy + 0.2f, dz - 0.42f);
+        wheel.localRotation = Quaternion.Euler(-60, 0, 0);
+        for (int i = 0; i < 16; i++)
+        {
+            float a = i * Mathf.PI * 2 / 16;
+            Prim(PrimitiveType.Cube, wheel, "Rim", new Vector3(Mathf.Cos(a) * 0.19f, Mathf.Sin(a) * 0.19f, 0), new Vector3(0.08f, 0.03f, 0.03f), Quaternion.Euler(0, 0, a * Mathf.Rad2Deg + 90), mFrame, lInt, false);
+        }
+        glow.Add(Prim(PrimitiveType.Cylinder, wheel, "HubLED", Vector3.zero, new Vector3(0.09f, 0.012f, 0.09f), Quaternion.Euler(90, 0, 0), mDashGlow, lInt, false).GetComponent<Renderer>());
+        Prim(PrimitiveType.Cylinder, wheel, "Column", new Vector3(0, 0, 0.18f), new Vector3(0.05f, 0.18f, 0.05f), Quaternion.Euler(90, 0, 0), mFrame, lInt, false);
+        foreach (var r in cab.GetComponentsInChildren<Renderer>()) r.receiveShadows = false;
+        dashGlow = glow.ToArray(); speedBar = speed.ToArray();
+        log.AppendLine($"  driver cabin: partition at z {zP:F2}, dashboard glow {glow.Count}, speed bar {speed.Count}");
+    }
+
+    static void HubMaterials()
+    {
+        MapKit.EnsureFolder(HubMatDir); MapKit.EnsureFolder(HubTexDir); MapKit.EnsureFolder(HubMeshDir);
+        // дымчато-сапфировое стекло ~15%: прозрачный центр, микро-сетка/штрихи по краям панели
+        var wallTex = GlassTexture("T_Hub_BusSmartGlass", (u, v) =>
+        {
+            float edge = Mathf.Min(Mathf.Min(u, 1 - u) * 6f, Mathf.Min(v, 1 - v) * 3f);    // 0 у края
+            float band = Mathf.Clamp01(1f - edge / 0.35f);                                    // полоса у края
+            bool tick = (Mathf.Repeat((u + v) * 90f, 1f) < 0.12f) || (Mathf.Repeat(v * 60f, 1f) < 0.08f && Mathf.Min(u, 1 - u) < 0.03f);
+            float a = 0.15f + band * (tick ? 0.45f : 0.08f);
+            return new Color(1, 1, 1, a);
+        });
+        // кабина: градиент-«козырёк» сверху, прозрачный центр
+        var cabTex = GlassTexture("T_Hub_BusCabinGlass", (u, v) =>
+        {
+            float visor = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.68f, 0.95f, v)) * 0.65f;
+            float a = 0.08f + visor;
+            return new Color(1, 1, 1, a);
+        });
+        var tint = new Color(0.07f, 0.16f, 0.34f, 1f);                     // дымчатый сапфир
+        mGlassWall = GlassMat("M_Hub_BusSmartGlass", tint, wallTex);
+        mGlassCabin = GlassMat("M_Hub_BusCabinGlass", tint * 0.8f, cabTex);
+        mFrame = HubLit("M_Hub_BusFrameMatte", new Color(0.035f, 0.035f, 0.04f), 0.2f, 0.25f);
+        mDashBody = HubLit("M_Hub_BusDash", new Color(0.05f, 0.05f, 0.06f), 0.3f, 0.45f);
+        mDashGlow = HubGlow("M_Hub_BusDashGlow", Sapphire * 1.5f);
+    }
+
+    static Material GlassMat(string name, Color tint, Texture2D tex)
+    {
+        string path = $"{HubMatDir}/{name}.mat";
+        var sh = Shader.Find("Universal Render Pipeline/Lit");
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (!m) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        m.shader = sh;
+        m.SetColor("_BaseColor", tint); m.SetTexture("_BaseMap", tex);
+        m.SetFloat("_Smoothness", 0.9f); m.SetFloat("_Metallic", 0.1f);
+        m.SetFloat("_EnvironmentReflections", 1f); m.DisableKeyword("_ENVIRONMENTREFLECTIONS_OFF");   // френелевский блик
+        m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f);
+        m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+        m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One); m.SetFloat("_DstBlendAlpha", (float)BlendMode.OneMinusSrcAlpha);
+        m.SetFloat("_ZWrite", 0f); m.SetFloat("_Cull", (float)CullMode.Off);
+        m.SetFloat("_BlendModePreserveSpecular", 1f); m.EnableKeyword("_ALPHAPREMULTIPLY_ON");
+        m.SetOverrideTag("RenderType", "Transparent");
+        m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        m.renderQueue = (int)RenderQueue.Transparent;
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    static Material HubLit(string name, Color c, float metal, float smooth)
+    {
+        string path = $"{HubMatDir}/{name}.mat";
+        var sh = Shader.Find("Universal Render Pipeline/Lit");
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (!m) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        m.shader = sh;
+        m.SetColor("_BaseColor", c); m.SetFloat("_Metallic", metal); m.SetFloat("_Smoothness", smooth);
+        m.SetFloat("_EnvironmentReflections", 0f); m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    static Material HubGlow(string name, Color c)
+    {
+        string path = $"{HubMatDir}/{name}.mat";
+        var sh = Shader.Find("Universal Render Pipeline/Unlit");
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (!m) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        m.shader = sh; m.SetColor("_BaseColor", c);
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    static Texture2D GlassTexture(string name, System.Func<float, float, Color> fn, int n = 256)
+    {
+        string path = $"{HubTexDir}/{name}.png";
+        var t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+        for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) t.SetPixel(x, y, fn((x + 0.5f) / n, (y + 0.5f) / n));
+        t.Apply();
+        System.IO.File.WriteAllBytes(path, t.EncodeToPNG());
+        Object.DestroyImmediate(t);
+        AssetDatabase.ImportAsset(path);
+        var imp = (TextureImporter)AssetImporter.GetAtPath(path);
+        imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.filterMode = FilterMode.Trilinear; imp.maxTextureSize = n; imp.mipmapEnabled = true;
+        imp.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+    }
+
+    static Mesh SaveMeshTo(Mesh mesh, string dir) { MapKit.EnsureFolder(dir); return SaveMesh(mesh, dir); }
 
     // =========================================================================== коллайдеры
     static void BuildColliders(Transform root)
@@ -1104,6 +1350,8 @@ public static class BlackBusBuilder
             B(sx < 0 ? "Rear_L" : "Rear_R", new Vector3(sx * (DoorHalfW + rw / 2f), H / 2f, DoorZ - 0.01f), new Vector3(rw, H, 0.1f));
         B("Rear_Top", new Vector3(0, (DoorTopY + H) / 2f, DoorZ - 0.01f), new Vector3(DoorHalfW * 2, H - DoorTopY, 0.1f));
         B("Step", new Vector3(0, 0.1f, DoorZ - 0.16f), new Vector3(DoorHalfW * 2 + 0.2f, 0.2f, 0.3f));
+        // стеклянная перегородка кабины водителя: в кабину не заходят
+        B("CabinPartition", new Vector3(0, (FloorY + CeilY) / 2f, CabinZ - 0.17f), new Vector3(2 * InHalfW, CeilY - FloorY, 0.36f));
     }
 
     /// Внешний габарит коллайдеров: салон (на 20% шире) шире кузова — стенки салона чуть выступают за борта.
@@ -1118,7 +1366,7 @@ public static class BlackBusBuilder
         Vector3 W2(float x, float y, float z) => root.TransformPoint(new Vector3(x, y, z));
         // 1) капсула «гориллы» проходит центром салона от проёма до дальней стенки
         int blocked = 0; float firstBlock = float.NaN;
-        for (float z = DoorZ + 0.4f; z < InteriorEndZ - 0.3f; z += 0.25f)
+        for (float z = DoorZ + 0.4f; z < CabinZ - 0.7f; z += 0.25f)
             if (Physics.CheckCapsule(W2(0, FloorY + 0.35f, z), W2(0, FloorY + 1.55f, z), 0.3f, mask, QueryTriggerInteraction.Ignore))
             { blocked++; if (float.IsNaN(firstBlock)) firstBlock = z; }
         sb.Append(blocked == 0 ? " path=OK" : $" path=BLOCKED x{blocked} (first z={firstBlock:F2}) ERROR");
@@ -1126,17 +1374,17 @@ public static class BlackBusBuilder
         var from = W2(0, FloorY + 1.4f, DoorZ - 1.5f);
         bool hit = Physics.Raycast(from, root.forward, out var h, 30f, mask, QueryTriggerInteraction.Ignore);
         float depth = hit ? root.InverseTransformPoint(h.point).z : float.NaN;
-        sb.Append(hit && Mathf.Abs(depth - InteriorEndZ) < 0.05f ? $" door→far wall OK ({depth - DoorZ:F2} m)" : $" door ray hit z={depth:F2} ({(hit ? h.collider.name : "nothing")}) ERROR");
+        sb.Append(hit && Mathf.Abs(depth - (CabinZ - 0.35f)) < 0.05f ? $" door→cabin glass OK ({depth - DoorZ:F2} m of {InteriorLen:F2} m salon)" : $" door ray hit z={depth:F2} ({(hit ? h.collider.name : "nothing")}) ERROR");
         // 3) мимо проёма корма держит
         bool rearHit = Physics.Raycast(W2(-1.0f, 1.2f, DoorZ - 1f), root.forward, out var rh, 2f, mask, QueryTriggerInteraction.Ignore);
         sb.Append(rearHit ? $" rear wall OK ({rh.collider.name})" : " rear wall MISSING ERROR");
         // 4) пол под ногами по всей длине (в том числе за северной стеной хаба)
         int noFloor = 0;
-        for (float z = DoorZ + 0.2f; z < InteriorEndZ; z += 0.5f)
+        for (float z = DoorZ + 0.2f; z < CabinZ - 0.4f; z += 0.5f)
             if (!Physics.Raycast(W2(0.6f, 1.5f, z), Vector3.down, out var fh, 2f, mask, QueryTriggerInteraction.Ignore) || Mathf.Abs(fh.point.y - FloorY) > 0.02f) noFloor++;
         sb.Append(noFloor == 0 ? " floor OK" : $" floor gaps x{noFloor} ERROR");
         // 5) боковые стенки держат изнутри
-        bool sideHit = Physics.Raycast(W2(0, 1.2f, InteriorEndZ - 1f), root.right, out var sh, 3f, mask, QueryTriggerInteraction.Ignore);
+        bool sideHit = Physics.Raycast(W2(0, 1.2f, CabinZ - 1f), root.right, out var sh, 3f, mask, QueryTriggerInteraction.Ignore);
         sb.Append(sideHit && Mathf.Abs(root.InverseTransformPoint(sh.point).x - InHalfW) < 0.03f ? " side walls OK" : " side wall ERROR");
         // 6) северная стена хаба вне коридора по-прежнему твёрдая
         bool wallHit = Physics.Raycast(new Vector3(0f, 1.2f, 12.5f), Vector3.forward, out var wh, 3f, mask, QueryTriggerInteraction.Ignore);
@@ -1183,7 +1431,7 @@ public static class BlackBusBuilder
     {
         var vp = map.GetComponentsInChildren<VanPortal>(true).FirstOrDefault();
         if (!vp) { log.AppendLine("ERROR: VanPortal not found"); return; }
-        float z0 = DoorZ + 1.0f, z1 = InteriorEndZ - 0.05f;
+        float z0 = DoorZ + 1.0f, z1 = CabinZ - 0.45f;   // до стеклянной кабины водителя
         vp.transform.SetPositionAndRotation(bus.TransformPoint(new Vector3(0, (FloorY + CeilY) / 2f, (z0 + z1) / 2f)), bus.rotation);
         vp.transform.localScale = Vector3.one;
         var box = vp.GetComponent<BoxCollider>();
@@ -1197,12 +1445,14 @@ public static class BlackBusBuilder
         {
             txt.text = "ВСЕ В САЛОН — ЕДЕМ НА ДЕЛО!";
             var rt = txt.rectTransform;
-            var world = bus.TransformPoint(new Vector3(0, 1.75f, InteriorEndZ - 0.02f));
+            // табло — на верхней балке кабины водителя, к экипажу; едет вместе с автобусом
+            rt.SetParent(bus.Find("Interior"), true);
+            var world = bus.TransformPoint(new Vector3(0, 2.2f, CabinZ - 0.42f));
             var local = rt.parent ? rt.parent.InverseTransformPoint(world) : world;
             rt.anchoredPosition3D = local; rt.localPosition = local;
             rt.rotation = bus.rotation * MapKit.Facing(Vector3.back);
-            rt.sizeDelta = new Vector2(InHalfW * 2f - 0.2f, 0.5f);
-            txt.fontSize = 2.2f; txt.fontSizeMax = 2.2f;
+            rt.sizeDelta = new Vector2(InHalfW * 2f - 0.4f, 0.3f);
+            txt.fontSize = 1.6f; txt.fontSizeMax = 1.6f;
             txt.color = new Color(0.55f, 0.85f, 1f);
             txt.GetComponent<Renderer>().allowOcclusionWhenDynamic = false;
             txt.gameObject.layer = LayerMask.NameToLayer(LayerInterior);   // висит в тоннеле — видно только из салона/сквозь проём
