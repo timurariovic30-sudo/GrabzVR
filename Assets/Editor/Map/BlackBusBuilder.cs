@@ -39,12 +39,12 @@ public static class BlackBusBuilder
     const float L = 6.4f;                 // старый джип был 5.1 м → +25%
     const float W = 2.8f, H = 2.5f;       // ширина, высота крыши
     const float Rb = 0.12f;               // радиус скругления продольных рёбер
-    const float Bottom = 0.28f;           // клиренс
+    const float Bottom = 0.2f;            // клиренс (низ кузова = пол салона − Rb)
     const float RearZ = -L / 2f, FrontZ = L / 2f;
-    const float FloorY = 0.4f, CeilY = 2.43f, InHalfW = 1.25f;
+    const float FloorY = Bottom + Rb, CeilY = 2.43f, InHalfW = 1.25f;   // пол салона 0.32
     const float InteriorLen = L * 1.7f;   // 10.88 м
     const float InteriorEndZ = RearZ + InteriorLen;
-    const float DoorHalfW = 0.65f, DoorTopY = 2.1f;
+    const float DoorHalfW = 0.65f, DoorTopY = 2.32f;   // просвет 2.0 м: проходит и ПК-игрок (CharacterController 1.8 м)
     const float RearWheelZ = -1.9f, FrontWheelZ = 1.95f, WheelR = 0.45f, ArchR = 0.56f;
     const float NorthWallInnerZ = 13.8f;
     static readonly Vector3 BusPos = new Vector3(4.2f, 0f, NorthWallInnerZ - 0.12f - FrontZ); // нос в 12 см от стены
@@ -328,7 +328,7 @@ public static class BlackBusBuilder
     {
         var poly = new[] { new Vector2(RearZ, Bottom), new Vector2(3.12f, Bottom), new Vector2(FrontZ + 0.05f, 0.75f),
                            new Vector2(3.24f, 1.1f), new Vector2(2.25f, H - 0.02f), new Vector2(RearZ, H) };   // лобовое под ~35°
-        var radii = new[] { Rb, 0.2f, 0.25f, 0.2f, 0.55f, 0.35f };
+        var radii = new[] { Rb, 0.2f, 0.25f, 0.2f, 0.55f, 0.15f };   // задний верхний угол 0.15 — под высокий проём
         var o = Fillet(poly, radii);
         // колёсные арки — в длинную нижнюю кромку
         int k = -1;
@@ -672,7 +672,7 @@ public static class BlackBusBuilder
         var step = Prim(PrimitiveType.Cube, door, "Step", new Vector3(0, 0.1f, RearZ - 0.16f), new Vector3(DoorHalfW * 2 + 0.2f, 0.2f, 0.3f), Quaternion.identity, mStep, 0);
         step.AddComponent<BoxCollider>();
         MapKit.Font = MapKit.Font ? MapKit.Font : AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MapKit.FontPath);
-        var label = MapKit.Text(door, "DoorLabel", "ВХОД · НА ДЕЛО", 1.1f, new Color(0.55f, 0.8f, 1f), new Vector3(0, 2.3f, RearZ - 0.005f), MapKit.Facing(Vector3.back), new Vector2(2.2f, 0.26f));
+        var label = MapKit.Text(door, "DoorLabel", "ВХОД · НА ДЕЛО", 0.9f, new Color(0.55f, 0.8f, 1f), new Vector3(0, 0.1f, RearZ - 0.311f), MapKit.Facing(Vector3.back), new Vector2(1.4f, 0.16f));   // на ступеньке: над высоким проёмом места нет
         label.GetComponent<Renderer>().allowOcclusionWhenDynamic = false;
     }
 
