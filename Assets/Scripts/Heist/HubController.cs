@@ -11,10 +11,17 @@ public class HubController : MonoBehaviour
     public TextMeshPro modeBoardTitle;
     public TextMeshPro modeBoardHint;
 
+    [Tooltip("Декоративные полосы сверху и снизу текста табло: красятся в цвет режима")]
+    public Renderer[] modeBoardBars;
+
     [Header("Лампочки у кнопок режимов (по порядку режимов)")]
     public Renderer[] modeLamps;
     public Color lampOn = new Color(0.3f, 1f, 0.3f);
     public Color lampOff = new Color(0.08f, 0.1f, 0.08f);
+
+    /// На столе только два режима: зелёная кнопка — классика, красная — хардкор.
+    public static Color ModeColor(GameSession.Mode m) => m == GameSession.Mode.Hardcore
+        ? new Color(1f, 0.16f, 0.12f) : new Color(0.25f, 1f, 0.35f);
 
     [Header("Витрина косметики")]
     public TextMeshPro cosmeticStatus;
@@ -25,6 +32,8 @@ public class HubController : MonoBehaviour
 
     void Start()
     {
+        // режимы «Побег от полиции» и «Паркур» со стола убраны — старый сохранённый выбор сводим к классике
+        if (GameSession.CurrentMode != GameSession.Mode.Hardcore) GameSession.CurrentMode = GameSession.Mode.Classic;
         ShowMode();
         ShowCosmetic();
     }
@@ -44,10 +53,20 @@ public class HubController : MonoBehaviour
     void ShowMode()
     {
         int m = (int)GameSession.CurrentMode;
-        if (modeBoardTitle) modeBoardTitle.text = "РЕЖИМ: " + GameSession.ModeTitles[m];
+        var col = ModeColor(GameSession.CurrentMode);
+        if (modeBoardTitle) { modeBoardTitle.text = GameSession.ModeTitles[m]; modeBoardTitle.color = col; }
         if (modeBoardHint) modeBoardHint.text = GameSession.ModeHints[m] + "\nЗАЙДИ В АВТОБУС, ЧТОБЫ ПОЕХАТЬ НА ДЕЛО!";
-        if (modeLamps == null) return;
         block ??= new MaterialPropertyBlock();
+        if (modeBoardBars != null)
+            foreach (var bar in modeBoardBars)
+            {
+                if (!bar) continue;
+                bar.GetPropertyBlock(block);
+                block.SetColor(BaseColorId, col);
+                block.SetColor(EmissionId, col * 2.5f);
+                bar.SetPropertyBlock(block);
+            }
+        if (modeLamps == null) return;
         for (int i = 0; i < modeLamps.Length; i++)
         {
             if (!modeLamps[i]) continue;
@@ -62,6 +81,7 @@ public class HubController : MonoBehaviour
     // ------------------------------------------------------------ косметика
     public void TryOnCrown() => TryOn("Crown");
     public void TryOnRobberMask() => TryOn("RobberMask");
+    public void TryOnRobberMaskWhite() => TryOn("RobberMaskWhite");
     public void TryOnGoldChain() => TryOn("GoldChain");
 
     /// Повторное нажатие той же кнопки снимает предмет. Головной убор, маска и цепь — разные слоты
@@ -76,7 +96,8 @@ public class HubController : MonoBehaviour
     public static string CosmeticName(string id) => id switch
     {
         "Crown" => "КОРОНА",
-        "RobberMask" => "МАСКА ГРАБИТЕЛЯ",
+        "RobberMask" => "ЧЁРНАЯ БАЛАКЛАВА",
+        "RobberMaskWhite" => "БЕЛАЯ БАЛАКЛАВА",
         "GoldChain" => "ЗОЛОТАЯ ЦЕПЬ",
         _ => id,
     };

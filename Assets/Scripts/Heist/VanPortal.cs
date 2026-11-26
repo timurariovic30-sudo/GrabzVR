@@ -19,6 +19,8 @@ public class VanPortal : MonoBehaviour
     public AudioSource engineSource;
     public Material fadeMaterial;
     public float fadeTime = 0.8f;
+    [Tooltip("Анимация отправки автобуса в тоннель (дверь, фары, дрожь, выезд)")]
+    public BusDeparture bus;
 
     BoxCollider zone;
     Coroutine running;
@@ -46,12 +48,14 @@ public class VanPortal : MonoBehaviour
             running = null;
             if (engineSource) engineSource.Stop();
             if (countdownText) countdownText.text = idleText;
+            if (bus) bus.Cancel();
         }
     }
 
     IEnumerator Countdown()
     {
         if (engineSource) engineSource.Play();
+        if (bus) bus.Board();                                   // дверь закрывается, фары, холостой ход
         for (int s = Mathf.CeilToInt(countdown); s > 0; s--)
         {
             if (countdownText) countdownText.text = $"ПОЕХАЛИ ЧЕРЕЗ {s}...";
@@ -59,6 +63,12 @@ public class VanPortal : MonoBehaviour
         }
         if (countdownText) countdownText.text = "НА ДЕЛО!";
         GameSession.ArrivedFromHub = true;
+        if (bus)
+        {
+            // автобус трогается в тоннель; экран гаснет к концу разгона
+            StartCoroutine(bus.DriveOff());
+            yield return new WaitForSeconds(Mathf.Max(0f, bus.driveTime - fadeTime - 0.6f));
+        }
         yield return ScreenFader.FadeOut(fadeMaterial, fadeTime);
         // в сети — едут все игроки сессии (общая смена сцены Fusion), без сети — как раньше
         if (!FusionNetworkManager.LoadSceneSynced(sceneName)) SceneManager.LoadScene(sceneName);

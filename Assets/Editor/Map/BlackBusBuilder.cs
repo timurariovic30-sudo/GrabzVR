@@ -36,14 +36,16 @@ public static class BlackBusBuilder
     public const string LayerPortal = "BusPortal", LayerInterior = "BusInterior", LayerExterior = "BusExterior";
 
     // ---- габариты, локальные оси автобуса: +Z к кабине, X вправо, Y вверх, y = 0 — пол хаба
-    const float L = 6.4f;                 // старый джип был 5.1 м → +25%
-    const float W = 2.8f, H = 2.5f;       // ширина, высота крыши
+    const float L = 5.6f;                 // новый компактный автобус Bus_Modern.glb (короче и приземистее)
+    static float W = 2.52f, H = 2.69f;    // ширина, высота — по пропорциям модели (пересчитываются при сборке)
+    const string ModelPath = "Assets/Art/GeneratedModels/Bus_Modern.glb";
     const float Rb = 0.12f;               // радиус скругления продольных рёбер
     const float Bottom = 0.2f;            // клиренс (низ кузова = пол салона − Rb)
     const float RearZ = -L / 2f, FrontZ = L / 2f;
-    const float FloorY = Bottom + Rb, CeilY = 2.43f, InHalfW = 1.25f;   // пол салона 0.32
+    const float FloorY = Bottom + Rb, CeilY = 2.43f, InHalfW = 1.5f;    // пол салона 0.32; салон на 20% шире прежнего (1.25)
     const float InteriorLen = L * 1.7f;   // 10.88 м
-    const float InteriorEndZ = RearZ + InteriorLen;
+    static float DoorZ = RearZ;           // плоскость проёма в корме (по поверхности модели)
+    static float InteriorEndZ => DoorZ + InteriorLen;
     const float DoorHalfW = 0.65f, DoorTopY = 2.32f;   // просвет 2.0 м: проходит и ПК-игрок (CharacterController 1.8 м)
     const float RearWheelZ = -1.9f, FrontWheelZ = 1.95f, WheelR = 0.45f, ArchR = 0.56f;
     const float NorthWallInnerZ = 13.8f;
@@ -95,11 +97,12 @@ public static class BlackBusBuilder
         root.SetPositionAndRotation(BusPos, Quaternion.identity);
         var portal = root.gameObject.AddComponent<BusPortal>();
 
-        BuildExterior(root, lExt);
+        BuildExteriorFromModel(root, lExt);
         var insideMask = BuildInterior(root, lInt, lPortal);
         portal.insideMask = insideMask;
         portal.doorZ = RearZ; portal.interiorEndZ = InteriorEndZ; portal.halfWidth = InHalfW;
         portal.floorY = FloorY; portal.ceilingY = CeilY; portal.doorHalfWidth = DoorHalfW; portal.doorTopY = DoorTopY;
+        BuildDepartureRig(root, lExt, lInt, lPortal);
         BuildColliders(root);
 
         foreach (var r in root.GetComponentsInChildren<Renderer>(true)) r.allowOcclusionWhenDynamic = false;
@@ -107,6 +110,7 @@ public static class BlackBusBuilder
         FixNorthWall(map.transform, lExt);
         FixVanPortal(map.transform, root);
         FixVanDecor(scene, root);
+        log.AppendLine(HubTunnelBuilder.Build(map.transform, root, InteriorEndZ, H, InHalfW + 0.14f));
 
         EditorSceneManager.MarkSceneDirty(scene);
         if (!EditorSceneManager.SaveScene(scene)) log.AppendLine("ERROR: save failed");
@@ -143,13 +147,15 @@ public static class BlackBusBuilder
             Feature(data, "Bus 1 Portal Mask", RenderPassEvent.BeforeRenderingOpaques, 1 << lPortal, null);
             Feature(data, "Bus 2 Interior", RenderPassEvent.BeforeRenderingOpaques, 1 << lInt, CompareFunction.Equal);
             Feature(data, "Bus 3 Exterior", RenderPassEvent.AfterRenderingOpaques, 1 << lExt, CompareFunction.NotEqual);
+            // прозрачное в салоне (табло отсчёта, ники горилл внутри) — тоже только сквозь проём и изнутри
+            Feature(data, "Bus 4 Interior Transparent", RenderPassEvent.AfterRenderingTransparents, 1 << lInt, CompareFunction.Equal, RenderQueueType.Transparent);
             data.SetDirty();
             EditorUtility.SetDirty(data);
             log.AppendLine($"  renderer {System.IO.Path.GetFileNameWithoutExtension(path)}: features = {string.Join(", ", data.rendererFeatures.Where(f => f).Select(f => f.name))}");
         }
     }
 
-    static void Feature(UniversalRendererData data, string name, RenderPassEvent evt, int mask, CompareFunction? stencil)
+    static void Feature(UniversalRendererData data, string name, RenderPassEvent evt, int mask, CompareFunction? stencil, RenderQueueType queue = RenderQueueType.Opaque)
     {
         var f = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(x => x && x.name == name);
         if (!f)
@@ -168,7 +174,7 @@ public static class BlackBusBuilder
         var s = f.settings;
         s.passTag = name;
         s.Event = evt;
-        s.filterSettings.RenderQueueType = RenderQueueType.Opaque;
+        s.filterSettings.RenderQueueType = queue;
         s.filterSettings.LayerMask = mask;
         s.filterSettings.PassNames = new string[0];
         s.overrideMaterial = null;
@@ -684,6 +690,289 @@ public static class BlackBusBuilder
         label.GetComponent<Renderer>().allowOcclusionWhenDynamic = false;
     }
 
+    // =========================================================================== кузов из Bus_Modern.glb
+    /// Кузов — модель Tripo (по 4 ракурсам референса). Масштаб до длины L, нос к +Z, низ колёс на полу.
+    /// Материалы: кузов — матово-сатиновый чёрный металл, стёкла (лобовое + боковые у водителя и пассажира)
+    /// — глухая глянцевая тонировка. Стёкла отделяются по текстуре модели (тёмные пиксели в зоне кабины).
+    /// В корме точно вырезается проём (треугольники обрезаются по прямоугольнику проёма).
+    static void BuildExteriorFromModel(Transform root, int lExt)
+    {
+        var ext = new GameObject("Exterior").transform;
+        ext.SetParent(root, false);
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
+        var mf = model ? model.GetComponentInChildren<MeshFilter>() : null;
+        if (!mf) { log.AppendLine("ERROR: " + ModelPath + " not found"); return; }
+        var src = mf.sharedMesh;
+        var sv = src.vertices; var sn = src.normals; var suv = src.uv; var st = src.triangles;
+
+        // оси модели: длина по X, нос — у +X (крыша там ниже — скат лобового)
+        var wv = sv.Select(p => mf.transform.TransformPoint(p)).ToArray();
+        var b = new Bounds(wv[0], Vector3.zero); foreach (var p in wv) b.Encapsulate(p);
+        float scale = L / b.size.x;
+        Vector3 ToBus(Vector3 p) => new Vector3(-(p.z - b.center.z), p.y - b.min.y, p.x - b.center.x) * scale;   // +X модели → +Z автобуса
+        Vector3 DirToBus(Vector3 d) => new Vector3(-d.z, d.y, d.x);
+        var v = wv.Select(ToBus).ToList();
+        var n = sn.Select(d => DirToBus(mf.transform.TransformDirection(d)).normalized).ToList();
+        var uv = suv.ToList();
+        W = b.size.z * scale; H = b.size.y * scale;
+        log.AppendLine($"  model: {src.vertexCount} verts, {st.Length / 3} tris, scale {scale:F2} → L {L:F2} × W {W:F2} × H {H:F2}");
+
+        // плоскость проёма: средняя Z задней стенки в зоне проёма
+        var rearZs = new List<float>();
+        for (int i = 0; i < v.Count; i++)
+            if (v[i].z < RearZ + 0.4f && Mathf.Abs(v[i].x) < DoorHalfW && v[i].y > FloorY && v[i].y < DoorTopY && n[i].z < -0.6f) rearZs.Add(v[i].z);
+        DoorZ = rearZs.Count > 0 ? rearZs.Average() : RearZ;
+        log.AppendLine($"  door plane z = {DoorZ:F3} (rear verts {rearZs.Count})");
+
+        // ---- текстура (для поиска стёкол)
+        var tex = ReadableTexture(model);
+        float Lum(Vector2 t)
+        {
+            if (tex == null) return 0.5f;
+            var c = tex.GetPixelBilinear(t.x, t.y);
+            return 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+        }
+
+        // ---- треугольники: проём + разделение на кузов / стекло
+        var body = new List<int>(); var glass = new List<int>();
+        int AddVert(Vector3 p, Vector3 nn, Vector2 t) { v.Add(p); n.Add(nn); uv.Add(t); return v.Count - 1; }
+        var candLum = new List<float>(); var bodyLum = new List<float>();
+        var tris = new List<(int a, int b, int c, bool cand, float lum)>();
+        int clipped = 0, removed = 0;
+        for (int i = 0; i < st.Length; i += 3)
+        {
+            int a = st[i], bb = st[i + 1], c = st[i + 2];
+            Vector3 ctr = (v[a] + v[bb] + v[c]) / 3f;
+            Vector3 fn = Vector3.Cross(v[bb] - v[a], v[c] - v[a]).normalized;
+            // задняя стенка в зоне проёма → вырезать прямоугольник
+            if (ctr.z < DoorZ + 0.3f && fn.z < -0.55f && TriTouchesDoor(v[a], v[bb], v[c]))
+            {
+                var pieces = ClipOutsideDoor(new List<(Vector3 p, Vector3 n, Vector2 t)> { (v[a], n[a], uv[a]), (v[bb], n[bb], uv[bb]), (v[c], n[c], uv[c]) });
+                clipped++;
+                if (pieces.Count == 0) removed++;
+                foreach (var poly in pieces)
+                {
+                    int i0 = AddVert(poly[0].p, poly[0].n, poly[0].t);
+                    for (int k = 1; k < poly.Count - 1; k++)
+                    {
+                        int i1 = AddVert(poly[k].p, poly[k].n, poly[k].t), i2 = AddVert(poly[k + 1].p, poly[k + 1].n, poly[k + 1].t);
+                        tris.Add((i0, i1, i2, false, 1f));
+                    }
+                }
+                continue;
+            }
+            // кандидаты в стёкла: лобовое (смотрит вперёд, верх кабины) и боковые окна кабины
+            bool windshield = ctr.z > FrontZ - 1.5f && fn.z > 0.25f && ctr.y > 0.48f * H && ctr.y < 0.95f * H;
+            bool sideWin = Mathf.Abs(fn.x) > 0.6f && ctr.z > FrontZ - 1.75f && ctr.z < FrontZ - 0.2f && ctr.y > 0.5f * H && ctr.y < 0.9f * H;
+            float lum = (Lum(uv[a]) + Lum(uv[bb]) + Lum(uv[c]) + Lum((uv[a] + uv[bb] + uv[c]) / 3f)) / 4f;
+            bool cand = windshield || sideWin;
+            (cand ? candLum : bodyLum).Add(lum);
+            tris.Add((a, bb, c, cand, lum));
+        }
+        float bodyMed = bodyLum.Count > 0 ? bodyLum.OrderBy(x => x).ElementAt(bodyLum.Count / 2) : 0.5f;
+        float thr = bodyMed * 0.8f;
+        foreach (var t in tris) (t.cand && t.lum < thr ? glass : body).AddRange(new[] { t.a, t.b, t.c });
+        log.AppendLine($"  doorway: {clipped} rear tris clipped ({removed} fully inside); glass {glass.Count / 3} tris (candidates {candLum.Count}, body lum median {bodyMed:F3}, threshold {thr:F3}, texture {(tex ? "ok" : "none")})");
+        if (tex) Object.DestroyImmediate(tex);
+
+        var mesh = new Mesh { name = "Bus_Modern_Body", indexFormat = IndexFormat.UInt32, subMeshCount = 2 };
+        mesh.SetVertices(v); mesh.SetNormals(n); mesh.SetUVs(0, uv);
+        mesh.SetTriangles(body, 0); mesh.SetTriangles(glass, 1);
+        mesh.RecalculateBounds();
+        mesh = SaveMesh(mesh);
+        var go = Part(ext, "Body", mesh, mBody, lExt);
+        go.GetComponent<MeshRenderer>().sharedMaterials = new[] { mBody, mGlass };
+
+        // ---- узкие LED-фары и задние фонари (поверх модели)
+        float FrontAt(float y, float x) => v.Where(p => Mathf.Abs(p.y - y) < 0.1f && Mathf.Abs(Mathf.Abs(p.x) - x) < 0.18f).Select(p => p.z).DefaultIfEmpty(FrontZ).Max();
+        float RearAt(float y, float x) => v.Where(p => Mathf.Abs(p.y - y) < 0.12f && Mathf.Abs(Mathf.Abs(p.x) - x) < 0.1f).Select(p => p.z).DefaultIfEmpty(RearZ).Min();
+        float hy = 0.34f * H;
+        var leds = new List<Renderer>();
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            float x = W / 2f - 0.42f;
+            var led = Prim(PrimitiveType.Cube, ext, "LED_Headlight", new Vector3(sx * x, hy, FrontAt(hy, x) + 0.004f), new Vector3(0.42f, 0.03f, 0.03f), Quaternion.Euler(0, -sx * 12f, sx * 7f), mLed, lExt, false);
+            leds.Add(led.GetComponent<Renderer>());
+            float tx = W / 2f - 0.07f, ty = 0.47f * H;
+            Prim(PrimitiveType.Cube, ext, "LED_Tail", new Vector3(sx * tx, ty, RearAt(ty, tx) - 0.01f), new Vector3(0.04f, 0.42f, 0.03f), Quaternion.identity, mTail, lExt, false);
+        }
+        headlightLeds = leds.ToArray();
+
+        // ---- вход: синяя рамка проёма и ступенька (обычный слой — видны и изнутри в проёме)
+        var door = new GameObject("Doorway").transform;
+        door.SetParent(ext, false);
+        float dz = DoorZ - 0.02f, dh = DoorTopY - FloorY;
+        foreach (float sx in new[] { -1f, 1f })
+            Prim(PrimitiveType.Cube, door, "DoorNeon_Side", new Vector3(sx * (DoorHalfW + 0.025f), FloorY + dh / 2f, dz), new Vector3(0.035f, dh + 0.05f, 0.035f), Quaternion.identity, mNeon, 0, false);
+        Prim(PrimitiveType.Cube, door, "DoorNeon_Top", new Vector3(0, DoorTopY + 0.025f, dz), new Vector3(DoorHalfW * 2 + 0.085f, 0.035f, 0.035f), Quaternion.identity, mNeon, 0, false);
+        Prim(PrimitiveType.Cube, door, "Step", new Vector3(0, 0.1f, DoorZ - 0.16f), new Vector3(DoorHalfW * 2 + 0.2f, 0.2f, 0.3f), Quaternion.identity, mStep, 0);
+        MapKit.Font = MapKit.Font ? MapKit.Font : AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MapKit.FontPath);
+        var label = MapKit.Text(door, "DoorLabel", "ВХОД · НА ДЕЛО", 0.9f, new Color(0.55f, 0.8f, 1f), new Vector3(0, 0.1f, DoorZ - 0.311f), MapKit.Facing(Vector3.back), new Vector2(1.4f, 0.16f));
+        label.GetComponent<Renderer>().allowOcclusionWhenDynamic = false;
+    }
+
+    static Renderer[] headlightLeds;
+
+    static bool TriTouchesDoor(Vector3 a, Vector3 b, Vector3 c)
+    {
+        float minX = Mathf.Min(a.x, b.x, c.x), maxX = Mathf.Max(a.x, b.x, c.x), minY = Mathf.Min(a.y, b.y, c.y), maxY = Mathf.Max(a.y, b.y, c.y);
+        return maxX > -DoorHalfW && minX < DoorHalfW && maxY > FloorY && minY < DoorTopY;
+    }
+
+    /// Части треугольника вне прямоугольника проёма (в проекции XY): режем по 4 прямым, отрезанное «снаружи» — оставляем.
+    static List<List<(Vector3 p, Vector3 n, Vector2 t)>> ClipOutsideDoor(List<(Vector3 p, Vector3 n, Vector2 t)> tri)
+    {
+        var result = new List<List<(Vector3, Vector3, Vector2)>>();
+        var pieces = new List<List<(Vector3 p, Vector3 n, Vector2 t)>> { tri };
+        var cuts = new System.Func<Vector3, float>[]
+        {
+            p => -p.x - DoorHalfW, p => p.x - DoorHalfW, p => FloorY - p.y, p => p.y - DoorTopY,
+        };
+        foreach (var f in cuts)
+        {
+            var next = new List<List<(Vector3 p, Vector3 n, Vector2 t)>>();
+            foreach (var poly in pieces)
+            {
+                Split(poly, f, out var outside, out var inside);
+                if (outside.Count >= 3) result.Add(outside.Select(x => (x.p, x.n, x.t)).ToList());
+                if (inside.Count >= 3) next.Add(inside);
+            }
+            pieces = next;
+        }
+        return result.Select(r => r.Select(x => (x.Item1, x.Item2, x.Item3)).ToList()).ToList();
+    }
+
+    /// Делит выпуклый многоугольник прямой f(p) = 0: outside — f > 0, inside — f ≤ 0.
+    static void Split(List<(Vector3 p, Vector3 n, Vector2 t)> poly, System.Func<Vector3, float> f,
+                      out List<(Vector3 p, Vector3 n, Vector2 t)> outside, out List<(Vector3 p, Vector3 n, Vector2 t)> inside)
+    {
+        outside = new List<(Vector3, Vector3, Vector2)>(); inside = new List<(Vector3, Vector3, Vector2)>();
+        for (int i = 0; i < poly.Count; i++)
+        {
+            var a = poly[i]; var b = poly[(i + 1) % poly.Count];
+            float fa = f(a.p), fb = f(b.p);
+            if (fa > 0) outside.Add(a); else inside.Add(a);
+            if ((fa > 0) != (fb > 0))
+            {
+                float t = fa / (fa - fb);
+                var m = (Vector3.Lerp(a.p, b.p, t), Vector3.Lerp(a.n, b.n, t).normalized, Vector2.Lerp(a.t, b.t, t));
+                outside.Add(m); inside.Add(m);
+            }
+        }
+    }
+
+    /// Базовая текстура модели в читаемом виде (через RenderTexture, 512 px).
+    static Texture2D ReadableTexture(GameObject model)
+    {
+        var mat = model.GetComponentInChildren<Renderer>()?.sharedMaterial;
+        Texture src = null;
+        if (mat) foreach (var name in mat.GetTexturePropertyNames()) { var t = mat.GetTexture(name); if (t && (name.ToLower().Contains("base") || name == "_MainTex")) { src = t; break; } }
+        if (!src) src = AssetDatabase.LoadAllAssetsAtPath(ModelPath).OfType<Texture2D>().FirstOrDefault();
+        if (!src) return null;
+        if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null) { log.AppendLine("  WARN: no GPU (batchmode -nographics) — glass by geometry only"); return null; }
+        var rt = RenderTexture.GetTemporary(512, 512, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        Graphics.Blit(src, rt);
+        var prev = RenderTexture.active; RenderTexture.active = rt;
+        var tex = new Texture2D(512, 512, TextureFormat.RGBA32, false);
+        tex.ReadPixels(new Rect(0, 0, 512, 512), 0, 0); tex.Apply();
+        RenderTexture.active = prev; RenderTexture.ReleaseTemporary(rt);
+        return tex;
+    }
+
+    // ---- рольставня входа, внутренняя дверь, фары с лучами, BusDeparture
+    static void BuildDepartureRig(Transform root, int lExt, int lInt, int lPortal)
+    {
+        var ext = root.Find("Exterior");
+        var dep = root.gameObject.AddComponent<BusDeparture>();
+        dep.exterior = ext;
+        float dh = DoorTopY - FloorY, dw = DoorHalfW * 2 + 0.08f;
+        var shutterMat = Lit("M_Bus_Shutter", Hex("#16161A"), 0.6f, 0.4f, envReflections: false);
+
+        // снаружи: рольставня (опора у верха проёма, тянется вниз)
+        var pivot = new GameObject("RearShutter").transform;
+        pivot.SetParent(ext.Find("Doorway"), false);
+        pivot.localPosition = new Vector3(0, DoorTopY + 0.02f, DoorZ - 0.035f);
+        int slats = 14;
+        for (int i = 0; i < slats; i++)
+            Prim(PrimitiveType.Cube, pivot, "Slat", new Vector3(0, -(i + 0.5f) * (dh + 0.04f) / slats, 0), new Vector3(dw, (dh + 0.04f) / slats * 0.92f, 0.025f), Quaternion.identity, shutterMat, 0, false);
+        dep.outerDoor = pivot;
+        dep.doorOpenLocal = dep.doorClosedLocal = pivot.localPosition;
+        dep.doorOpenScale = new Vector3(1, 0.02f, 1); dep.doorClosedScale = Vector3.one;
+        pivot.localScale = dep.doorOpenScale;
+        dep.doorMask = root.Find("PortalMasks/DoorMask")?.GetComponent<Renderer>();
+
+        // изнутри: закрытая дверь салона + маска (видна только из салона)
+        var inner = new GameObject("InnerDoor").transform;
+        inner.SetParent(root, false);
+        var maskMb = new MB(1);
+        maskMb.Quad(new Vector3(-DoorHalfW, FloorY, DoorZ + 0.002f), Vector3.right * 2 * DoorHalfW, Vector3.up * dh, Vector3.forward, 0);
+        Part(inner, "InnerDoorMask", SaveMesh(maskMb.Build("Bus_InnerDoorMask")), mMask, lPortal, false);
+        var panel = Prim(PrimitiveType.Cube, inner, "InnerDoorPanel", new Vector3(0, FloorY + dh / 2f, DoorZ + 0.015f), new Vector3(DoorHalfW * 2, dh, 0.02f), Quaternion.identity, mWall, lInt, false);
+        panel.GetComponent<Renderer>().receiveShadows = false;
+        inner.gameObject.SetActive(false);
+        dep.innerDoor = inner.gameObject;
+
+        // фары: мощные холодные LED-споты + мягкие объёмные лучи
+        var lights = new List<Light>(); var beams = new List<Renderer>();
+        var beamMat = BeamMaterial();
+        var beamMesh = SaveMesh(ConeMesh("Bus_HeadlightBeam", 9f, 0.12f, 1.7f));
+        float hy = 0.34f * H;
+        foreach (var led in headlightLeds)
+        {
+            var p = led.transform.localPosition;
+            var lgo = new GameObject("Headlight");
+            lgo.transform.SetParent(ext, false);
+            lgo.transform.localPosition = new Vector3(p.x, hy, p.z + 0.05f);
+            lgo.transform.localRotation = Quaternion.Euler(4f, 0, 0);
+            var l = lgo.AddComponent<Light>();
+            l.type = LightType.Spot; l.color = new Color(0.82f, 0.9f, 1f); l.range = 34f; l.spotAngle = 52f; l.innerSpotAngle = 20f;
+            l.shadows = LightShadows.None; l.intensity = 0f; l.enabled = false;
+            lights.Add(l);
+            var beam = Part(lgo.transform, "LightBeam", beamMesh, beamMat, 0, false);
+            beam.GetComponent<Renderer>().enabled = false;
+            beams.Add(beam.GetComponent<Renderer>());
+        }
+        dep.headlights = lights.ToArray(); dep.beams = beams.ToArray(); dep.ledStrips = headlightLeds;
+        foreach (var r in headlightLeds) r.enabled = false;
+        log.AppendLine("  departure: rear shutter, inner door, 2 headlights + beams");
+    }
+
+    static Material BeamMaterial()
+    {
+        string path = $"{MatDir}/M_Bus_HeadlightBeam.mat";
+        var sh = Shader.Find("Universal Render Pipeline/Unlit");
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (!m) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        m.shader = sh;
+        m.SetColor("_BaseColor", new Color(0.05f, 0.058f, 0.07f, 1f));   // аддитивно: мягкий холодный объём
+        m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f);
+        m.SetFloat("_SrcBlend", (float)BlendMode.One); m.SetFloat("_DstBlend", (float)BlendMode.One);
+        m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One); m.SetFloat("_DstBlendAlpha", (float)BlendMode.One);
+        m.SetFloat("_ZWrite", 0f); m.SetFloat("_Cull", (float)CullMode.Off);
+        m.SetOverrideTag("RenderType", "Transparent");
+        m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        m.renderQueue = (int)RenderQueue.Transparent;
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    /// Открытый конус вдоль +Z (луч фары): у фары — r0, на конце — r1; вершинный цвет гаснет к концу.
+    static Mesh ConeMesh(string name, float len, float r0, float r1, int seg = 18)
+    {
+        var v = new List<Vector3>(); var col = new List<Color>(); var t = new List<int>();
+        for (int i = 0; i <= seg; i++)
+        {
+            float a = i * Mathf.PI * 2 / seg;
+            var d = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0);
+            v.Add(d * r0); col.Add(Color.white);
+            v.Add(d * r1 + Vector3.forward * len); col.Add(Color.black);
+        }
+        for (int i = 0; i < seg; i++) { int a = i * 2; t.AddRange(new[] { a, a + 1, a + 2, a + 2, a + 1, a + 3 }); }
+        var m = new Mesh { name = name };
+        m.SetVertices(v); m.SetColors(col); m.SetTriangles(t, 0); m.RecalculateNormals(); m.RecalculateBounds();
+        return m;
+    }
+
     // =========================================================================== салон
     class MB
     {
@@ -736,7 +1025,7 @@ public static class BlackBusBuilder
         inside.SetParent(root, false);
 
         // 3 секции (у каждой свои ближайшие лампы — лимит доп. источников на объект на Quest)
-        float[] zs = { RearZ, RearZ + InteriorLen / 3f, RearZ + InteriorLen * 2f / 3f, InteriorEndZ };
+        float[] zs = { DoorZ, DoorZ + InteriorLen / 3f, DoorZ + InteriorLen * 2f / 3f, InteriorEndZ };
         for (int s = 0; s < 3; s++)
         {
             var mb = new MB(2);
@@ -751,21 +1040,21 @@ public static class BlackBusBuilder
         var led = new GameObject("NeonEdges").transform;
         led.SetParent(inside, false);
         const float s0 = 0.05f, e = s0 / 2f;
-        float hw = InHalfW, len = InteriorLen, h = CeilY - FloorY, zc = (RearZ + InteriorEndZ) / 2f;
+        float hw = InHalfW, len = InteriorLen, h = CeilY - FloorY, zc = (DoorZ + InteriorEndZ) / 2f;
         void Bar(string n, Vector3 c, Vector3 size) => Prim(PrimitiveType.Cube, led, n, c, size, Quaternion.identity, mNeon, lInt, false).GetComponent<Renderer>().receiveShadows = false;
         foreach (float sx in new[] { -1f, 1f })
         {
             Bar("Neon_FloorEdge", new Vector3(sx * (hw - e), FloorY + e, zc), new Vector3(s0, s0, len));
             Bar("Neon_CeilEdge", new Vector3(sx * (hw - e), CeilY - e, zc), new Vector3(s0, s0, len));
             Bar("Neon_FarCorner", new Vector3(sx * (hw - e), FloorY + h / 2f, InteriorEndZ - e), new Vector3(s0, h, s0));
-            Bar("Neon_RearCorner", new Vector3(sx * (hw - e), FloorY + h / 2f, RearZ + e), new Vector3(s0, h, s0));
-            Bar("Neon_RearFloor", new Vector3(sx * (hw + DoorHalfW) / 2f, FloorY + e, RearZ + e), new Vector3(hw - DoorHalfW, s0, s0));
-            Bar("Neon_DoorInside", new Vector3(sx * (DoorHalfW + e), FloorY + (DoorTopY - FloorY) / 2f, RearZ + e), new Vector3(s0, DoorTopY - FloorY, s0));
+            Bar("Neon_RearCorner", new Vector3(sx * (hw - e), FloorY + h / 2f, DoorZ + e), new Vector3(s0, h, s0));
+            Bar("Neon_RearFloor", new Vector3(sx * (hw + DoorHalfW) / 2f, FloorY + e, DoorZ + e), new Vector3(hw - DoorHalfW, s0, s0));
+            Bar("Neon_DoorInside", new Vector3(sx * (DoorHalfW + e), FloorY + (DoorTopY - FloorY) / 2f, DoorZ + e), new Vector3(s0, DoorTopY - FloorY, s0));
         }
         Bar("Neon_FarFloor", new Vector3(0, FloorY + e, InteriorEndZ - e), new Vector3(2 * hw, s0, s0));
         Bar("Neon_FarCeil", new Vector3(0, CeilY - e, InteriorEndZ - e), new Vector3(2 * hw, s0, s0));
-        Bar("Neon_RearCeil", new Vector3(0, CeilY - e, RearZ + e), new Vector3(2 * hw, s0, s0));
-        Bar("Neon_DoorTopInside", new Vector3(0, DoorTopY + e, RearZ + e), new Vector3(2 * DoorHalfW + 2 * s0, s0, s0));
+        Bar("Neon_RearCeil", new Vector3(0, CeilY - e, DoorZ + e), new Vector3(2 * hw, s0, s0));
+        Bar("Neon_DoorTopInside", new Vector3(0, DoorTopY + e, DoorZ + e), new Vector3(2 * DoorHalfW + 2 * s0, s0, s0));
 
         // мягкий синий свет: только салон и игроки (на соседний пол хаба не «протекает»)
         int mask = (1 << lInt) | (1 << LayerMask.NameToLayer("Player")) | (1 << LayerMask.NameToLayer("LocalHead"));
@@ -782,10 +1071,10 @@ public static class BlackBusBuilder
         var masks = new GameObject("PortalMasks").transform;
         masks.SetParent(root, false);
         var doorMb = new MB(1);
-        doorMb.Quad(new Vector3(-DoorHalfW, FloorY, RearZ - 0.003f), Vector3.right * 2 * DoorHalfW, Vector3.up * (DoorTopY - FloorY), Vector3.back, 0);
+        doorMb.Quad(new Vector3(-DoorHalfW, FloorY, DoorZ - 0.003f), Vector3.right * 2 * DoorHalfW, Vector3.up * (DoorTopY - FloorY), Vector3.back, 0);
         Part(masks, "DoorMask", SaveMesh(doorMb.Build("Bus_DoorMask")), mMask, lPortal, false).GetComponent<Renderer>().receiveShadows = false;
         var inMb = new MB(1);
-        Shell(inMb, RearZ, InteriorEndZ, true, true, true);
+        Shell(inMb, DoorZ, InteriorEndZ, true, true, true);
         var im = Part(masks, "InsideMask", SaveMesh(inMb.Build("Bus_InsideMask")), mMask, lPortal, false).GetComponent<Renderer>();
         im.receiveShadows = false;
         return im;
@@ -797,7 +1086,7 @@ public static class BlackBusBuilder
         var col = new GameObject("Colliders").transform;
         col.SetParent(root, false);
         col.gameObject.layer = 0;
-        float outer = W / 2f + 0.02f, zEnd = InteriorEndZ + 0.12f, zc = (RearZ + zEnd) / 2f, len = zEnd - RearZ;
+        float outer = Outer, zEnd = InteriorEndZ + 0.12f, zc = (DoorZ + zEnd) / 2f, len = zEnd - DoorZ;
         void B(string n, Vector3 c, Vector3 s)
         {
             var go = new GameObject(n); go.transform.SetParent(col, false); go.transform.localPosition = c;
@@ -812,9 +1101,13 @@ public static class BlackBusBuilder
         B("FarWall", new Vector3(0, H / 2f, InteriorEndZ + 0.06f), new Vector3(outer * 2, H, 0.12f));
         float rw = outer - DoorHalfW;
         foreach (float sx in new[] { -1f, 1f })
-            B(sx < 0 ? "Rear_L" : "Rear_R", new Vector3(sx * (DoorHalfW + rw / 2f), H / 2f, RearZ - 0.01f), new Vector3(rw, H, 0.1f));
-        B("Rear_Top", new Vector3(0, (DoorTopY + H) / 2f, RearZ - 0.01f), new Vector3(DoorHalfW * 2, H - DoorTopY, 0.1f));
+            B(sx < 0 ? "Rear_L" : "Rear_R", new Vector3(sx * (DoorHalfW + rw / 2f), H / 2f, DoorZ - 0.01f), new Vector3(rw, H, 0.1f));
+        B("Rear_Top", new Vector3(0, (DoorTopY + H) / 2f, DoorZ - 0.01f), new Vector3(DoorHalfW * 2, H - DoorTopY, 0.1f));
+        B("Step", new Vector3(0, 0.1f, DoorZ - 0.16f), new Vector3(DoorHalfW * 2 + 0.2f, 0.2f, 0.3f));
     }
+
+    /// Внешний габарит коллайдеров: салон (на 20% шире) шире кузова — стенки салона чуть выступают за борта.
+    static float Outer => Mathf.Max(W / 2f, InHalfW + 0.12f) + 0.02f;
 
     /// Проверка проходимости: от ступеньки сквозь проём до конца салона, стены держат, пол везде.
     static string TestColliders(Transform root)
@@ -825,21 +1118,21 @@ public static class BlackBusBuilder
         Vector3 W2(float x, float y, float z) => root.TransformPoint(new Vector3(x, y, z));
         // 1) капсула «гориллы» проходит центром салона от проёма до дальней стенки
         int blocked = 0; float firstBlock = float.NaN;
-        for (float z = RearZ + 0.4f; z < InteriorEndZ - 0.3f; z += 0.25f)
+        for (float z = DoorZ + 0.4f; z < InteriorEndZ - 0.3f; z += 0.25f)
             if (Physics.CheckCapsule(W2(0, FloorY + 0.35f, z), W2(0, FloorY + 1.55f, z), 0.3f, mask, QueryTriggerInteraction.Ignore))
             { blocked++; if (float.IsNaN(firstBlock)) firstBlock = z; }
         sb.Append(blocked == 0 ? " path=OK" : $" path=BLOCKED x{blocked} (first z={firstBlock:F2}) ERROR");
         // 2) сквозь проём снаружи: луч на высоте головы проходит внутрь до дальней стенки
-        var from = W2(0, FloorY + 1.4f, RearZ - 1.5f);
+        var from = W2(0, FloorY + 1.4f, DoorZ - 1.5f);
         bool hit = Physics.Raycast(from, root.forward, out var h, 30f, mask, QueryTriggerInteraction.Ignore);
         float depth = hit ? root.InverseTransformPoint(h.point).z : float.NaN;
-        sb.Append(hit && Mathf.Abs(depth - InteriorEndZ) < 0.05f ? $" door→far wall OK ({depth - RearZ:F2} m)" : $" door ray hit z={depth:F2} ({(hit ? h.collider.name : "nothing")}) ERROR");
+        sb.Append(hit && Mathf.Abs(depth - InteriorEndZ) < 0.05f ? $" door→far wall OK ({depth - DoorZ:F2} m)" : $" door ray hit z={depth:F2} ({(hit ? h.collider.name : "nothing")}) ERROR");
         // 3) мимо проёма корма держит
-        bool rearHit = Physics.Raycast(W2(-1.0f, 1.2f, RearZ - 1f), root.forward, out var rh, 2f, mask, QueryTriggerInteraction.Ignore);
+        bool rearHit = Physics.Raycast(W2(-1.0f, 1.2f, DoorZ - 1f), root.forward, out var rh, 2f, mask, QueryTriggerInteraction.Ignore);
         sb.Append(rearHit ? $" rear wall OK ({rh.collider.name})" : " rear wall MISSING ERROR");
         // 4) пол под ногами по всей длине (в том числе за северной стеной хаба)
         int noFloor = 0;
-        for (float z = RearZ + 0.2f; z < InteriorEndZ; z += 0.5f)
+        for (float z = DoorZ + 0.2f; z < InteriorEndZ; z += 0.5f)
             if (!Physics.Raycast(W2(0.6f, 1.5f, z), Vector3.down, out var fh, 2f, mask, QueryTriggerInteraction.Ignore) || Mathf.Abs(fh.point.y - FloorY) > 0.02f) noFloor++;
         sb.Append(noFloor == 0 ? " floor OK" : $" floor gaps x{noFloor} ERROR");
         // 5) боковые стенки держат изнутри
@@ -866,18 +1159,23 @@ public static class BlackBusBuilder
         cols.SetParent(wall.parent, false);
         cols.position = Vector3.zero; cols.rotation = Quaternion.identity; cols.localScale = Vector3.one;
         var b = wall.GetComponent<Renderer>().bounds;
-        float gx0 = BusPos.x - W / 2f - 0.02f, gx1 = BusPos.x + W / 2f + 0.02f, gTop = H + 0.05f;
+        // въезд в тоннель (HubTunnelBuilder) — проём в стене; по бокам от автобуса и над ним — невидимые барьеры
+        float mx0 = BusPos.x - HubTunnelBuilder.HalfW, mx1 = BusPos.x + HubTunnelBuilder.HalfW, mTop = HubTunnelBuilder.Height;
+        float gx0 = BusPos.x - Outer, gx1 = BusPos.x + Outer, gTop = H + 0.05f;
         void C(Vector3 min, Vector3 max)
         {
             var bc = cols.gameObject.AddComponent<BoxCollider>();
             bc.center = cols.InverseTransformPoint((min + max) / 2f);
             bc.size = max - min;
         }
-        C(new Vector3(b.min.x, b.min.y, b.min.z), new Vector3(gx0, b.max.y, b.max.z));
-        C(new Vector3(gx1, b.min.y, b.min.z), new Vector3(b.max.x, b.max.y, b.max.z));
-        C(new Vector3(gx0, gTop, b.min.z), new Vector3(gx1, b.max.y, b.max.z));
+        C(new Vector3(b.min.x, b.min.y, b.min.z), new Vector3(mx0, b.max.y, b.max.z));          // стена слева от въезда
+        C(new Vector3(mx1, b.min.y, b.min.z), new Vector3(b.max.x, b.max.y, b.max.z));          // справа
+        C(new Vector3(mx0, mTop, b.min.z), new Vector3(mx1, b.max.y, b.max.z));                 // над въездом
+        C(new Vector3(mx0, b.min.y, b.min.z), new Vector3(gx0, mTop, b.max.z));                 // барьер слева от автобуса
+        C(new Vector3(gx1, b.min.y, b.min.z), new Vector3(mx1, mTop, b.max.z));                 // справа
+        C(new Vector3(gx0, gTop, b.min.z), new Vector3(gx1, mTop, b.max.z));                    // над автобусом
         GameObjectUtility.SetStaticEditorFlags(cols.gameObject, StaticEditorFlags.BatchingStatic);
-        log.AppendLine($"  Wall_N → layer {LayerExterior}, collider gap x {gx0:F2}..{gx1:F2}, y < {gTop:F2}");
+        log.AppendLine($"  Wall_N → layer {LayerExterior}, tunnel mouth x {mx0:F2}..{mx1:F2} y < {mTop:F2}, bus corridor x {gx0:F2}..{gx1:F2} y < {gTop:F2}");
     }
 
     /// Зона посадки — салон (от 1 м за проёмом до конца), табло отсчёта — на передней стенке салона.
@@ -885,12 +1183,13 @@ public static class BlackBusBuilder
     {
         var vp = map.GetComponentsInChildren<VanPortal>(true).FirstOrDefault();
         if (!vp) { log.AppendLine("ERROR: VanPortal not found"); return; }
-        float z0 = RearZ + 1.0f, z1 = InteriorEndZ - 0.05f;
+        float z0 = DoorZ + 1.0f, z1 = InteriorEndZ - 0.05f;
         vp.transform.SetPositionAndRotation(bus.TransformPoint(new Vector3(0, (FloorY + CeilY) / 2f, (z0 + z1) / 2f)), bus.rotation);
         vp.transform.localScale = Vector3.one;
         var box = vp.GetComponent<BoxCollider>();
         box.center = Vector3.zero;
         box.size = new Vector3(InHalfW * 2f, CeilY - FloorY + 0.6f, z1 - z0);
+        vp.bus = bus.GetComponent<BusDeparture>();
         EditorUtility.SetDirty(vp); EditorUtility.SetDirty(box);
 
         var txt = vp.countdownText;
@@ -906,6 +1205,7 @@ public static class BlackBusBuilder
             txt.fontSize = 2.2f; txt.fontSizeMax = 2.2f;
             txt.color = new Color(0.55f, 0.85f, 1f);
             txt.GetComponent<Renderer>().allowOcclusionWhenDynamic = false;
+            txt.gameObject.layer = LayerMask.NameToLayer(LayerInterior);   // висит в тоннеле — видно только из салона/сквозь проём
             EditorUtility.SetDirty(txt);
         }
         var hint = map.GetComponentsInChildren<TextMeshPro>(true).FirstOrDefault(t => t.name == "ModeBoard_Hint");
@@ -965,15 +1265,17 @@ public static class BlackBusBuilder
         Vector3 P(float x, float y, float z) => bus.TransformPoint(new Vector3(x, y, z));
         var shots = new (string name, Vector3 pos, Vector3 look)[]
         {
-            ("01_rear_door", P(0.4f, 1.75f, RearZ - 4.5f), P(0, 1.3f, RearZ + 3f)),
+            ("01_rear_door", P(0.4f, 1.75f, DoorZ - 4.5f), P(0, 1.3f, DoorZ + 3f)),
             ("02_side_front", P(-5.5f, 1.8f, 1.5f), P(0, 1.1f, 1.2f)),
             ("03_threequarter", P(-4.5f, 2.2f, -6.5f), P(0, 1.0f, 0.5f)),
-            ("04_doorway_close", P(-0.3f, 1.6f, RearZ - 1.2f), P(0.2f, 1.2f, InteriorEndZ)),
-            ("05_inside_forward", P(0f, 1.85f, RearZ + 1.2f), P(0, 1.3f, InteriorEndZ)),
-            ("06_inside_back", P(0.2f, 1.85f, InteriorEndZ - 1.0f), P(0, 1.2f, RearZ)),
+            ("04_doorway_close", P(-0.3f, 1.6f, DoorZ - 1.2f), P(0.2f, 1.2f, InteriorEndZ)),
+            ("05_inside_forward", P(0f, 1.85f, DoorZ + 1.2f), P(0, 1.3f, InteriorEndZ)),
+            ("06_inside_back", P(0.2f, 1.85f, InteriorEndZ - 1.0f), P(0, 1.2f, DoorZ)),
             ("07_north_wall_side", P(-3.5f, 1.8f, 0f), P(0, 1.5f, FrontZ + 2f)),
             ("08_top", P(-6f, 6.5f, -7f), P(0, 0.5f, 1f)),
             ("09_front_corner", P(-3.4f, 1.5f, 1.6f), P(0f, 1.5f, 3.0f)),
+            ("12_tunnel_mouth", P(-1.5f, 3.2f, -9f), P(0f, 2f, FrontZ + 4f)),
+            ("13_tunnel_inside", P(0.8f, 3.4f, FrontZ + 1.0f), P(0f, 1.5f, FrontZ + 25f)),
         };
         var go = new GameObject("BusPreviewCam");
         var cam = go.AddComponent<Camera>();
@@ -992,7 +1294,26 @@ public static class BlackBusBuilder
             tex.Apply();
             System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, s.name + ".png"), tex.EncodeToPNG());
         }
+        // выезд: ставня закрыта, фары горят, кузов уехал на 7 м в тоннель (только для снимка, сцена не сохраняется)
+        var dep = bus.GetComponent<BusDeparture>();
+        if (dep)
+        {
+            if (dep.outerDoor) dep.outerDoor.localScale = Vector3.one;
+            foreach (var l in dep.headlights) { l.enabled = true; l.intensity = dep.headlightIntensity; }
+            foreach (var r in dep.beams) r.enabled = true;
+            foreach (var r in dep.ledStrips) r.enabled = true;
+            var mask = bus.Find("PortalMasks/DoorMask")?.GetComponent<Renderer>(); if (mask) mask.enabled = false;
+            foreach (var (n, z) in new[] { ("10_departure_start", 0f), ("11_departure_tunnel", 7f) })
+            {
+                dep.exterior.localPosition = new Vector3(0, 0, z);
+                var pos = P(-2.2f, 2.0f, DoorZ - 5.5f); var look = P(0, 1.2f, FrontZ + 6f);
+                go.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look - pos));
+                cam.Render(); RenderTexture.active = rt; tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0); tex.Apply();
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, n + ".png"), tex.EncodeToPNG());
+            }
+        }
         RenderTexture.active = null;
+        cam.targetTexture = null;
         Object.DestroyImmediate(go); Object.DestroyImmediate(rt); Object.DestroyImmediate(tex);
         Debug.Log("[BusPreview] saved to " + dir);
         if (Application.isBatchMode) EditorApplication.Exit(0);

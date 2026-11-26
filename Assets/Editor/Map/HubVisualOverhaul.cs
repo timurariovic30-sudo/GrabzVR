@@ -270,7 +270,7 @@ public static class HubVisualOverhaul
     static Mesh builtinCyl;
 
     /// Единичный куб, у которого UV в метрах (по размеру объекта / tile) — текстура тайлится без растяжения.
-    static Mesh BoxMesh(Vector3 scale, float tile)
+    internal static Mesh BoxMesh(Vector3 scale, float tile)
     {
         scale = new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
         string key = $"HubBox_{scale.x:0.00}_{scale.y:0.00}_{scale.z:0.00}_{tile:0.0}".Replace(',', '.');

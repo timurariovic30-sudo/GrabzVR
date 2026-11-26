@@ -15,9 +15,9 @@ public static class GameSession
 
     public static readonly string[] ModeTitles =
     {
-        "КЛАССИЧЕСКОЕ ОГРАБЛЕНИЕ (БАНК)",
+        "КЛАССИЧЕСКОЕ ОГРАБЛЕНИЕ БАНКА",
         "ПОБЕГ ОТ ПОЛИЦИИ (СКОРО / ТЕСТ)",
-        "ХАРДКОР: ОДНА ЖИЗНЬ",
+        "ОГРАБЛЕНИЕ ХАРДКОР",
         "ТРЕНИРОВКА ПАРКУРА",
     };
 
@@ -57,7 +57,7 @@ public static class GameSession
 
     public static CosmeticSlot SlotOf(string id) => id switch
     {
-        "RobberMask" => CosmeticSlot.FaceMask,
+        "RobberMask" or "RobberMaskWhite" => CosmeticSlot.FaceMask,   // чёрная и белая балаклава
         "GoldChain" => CosmeticSlot.Neck,
         _ => CosmeticSlot.Headwear,       // Crown и будущие шапки
     };

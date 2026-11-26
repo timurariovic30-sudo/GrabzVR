@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public class NetworkGorillaAvatar : NetworkBehaviour
 {
-    static readonly string[] CosmeticIds = { "", "Crown", "RobberMask", "GoldChain" };
+    static readonly string[] CosmeticIds = { "", "Crown", "RobberMask", "GoldChain", "RobberMaskWhite" };
 
     [Networked] public Vector3 HeadPos { get; set; }
     [Networked] public Quaternion HeadRot { get; set; }

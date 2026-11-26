@@ -19,7 +19,7 @@ public class GrabzComputer : MonoBehaviour
 {
     public static readonly string[] Tabs = { "ROOM", "NAME", "COLOR", "TURN", "MIC", "QUEUE", "GROUP", "VOICE", "ITEMS", "CREDITS" };
     static readonly string[] ItemIds = { "Crown", "RobberMask", "GoldChain" };
-    static readonly string[] ItemNames = { "КОРОНА", "МАСКА ГРАБИТЕЛЯ", "ЗОЛОТАЯ ЦЕПЬ" };
+    static readonly string[] ItemNames = { "КОРОНА", "ЧЁРНАЯ БАЛАКЛАВА", "ЗОЛОТАЯ ЦЕПЬ" };
 
     public TextMeshPro tabsText;
     public TextMeshPro screenText;
@@ -146,7 +146,14 @@ public class GrabzComputer : MonoBehaviour
                 if (opt == 1 || opt == 2) GrabzSettings.Voice = opt - 1;
                 break;
             case "ITEMS":
-                if (opt >= 1 && opt <= 3) ToggleItem(ItemIds[opt - 1]);
+                if (opt == 2)
+                {
+                    // балаклава: нет → чёрная → белая → нет
+                    if (GameSession.IsWorn("RobberMask")) ToggleItem("RobberMaskWhite");
+                    else if (GameSession.IsWorn("RobberMaskWhite")) ToggleItem("RobberMaskWhite");
+                    else ToggleItem("RobberMask");
+                }
+                else if (opt == 1 || opt == 3) ToggleItem(ItemIds[opt - 1]);
                 break;
         }
         Refresh();
@@ -245,7 +252,11 @@ public class GrabzComputer : MonoBehaviour
                 break;
             case "ITEMS":
                 for (int i = 0; i < 3; i++)
-                    s.AppendLine((GameSession.IsWorn(ItemIds[i]) ? "> " : "  ") + $"OPTION {i + 1}: {ItemNames[i]}" + (GameSession.IsWorn(ItemIds[i]) ? "  [НАДЕТО]" : ""));
+                {
+                    string id = i == 1 && GameSession.IsWorn("RobberMaskWhite") ? "RobberMaskWhite" : ItemIds[i];
+                    string name = i == 1 ? (id == "RobberMaskWhite" ? "БАЛАКЛАВА: БЕЛАЯ" : "БАЛАКЛАВА: ЧЁРНАЯ / БЕЛАЯ") : ItemNames[i];
+                    s.AppendLine((GameSession.IsWorn(id) ? "> " : "  ") + $"OPTION {i + 1}: {name}" + (GameSession.IsWorn(id) ? "  [НАДЕТО]" : ""));
+                }
                 s.AppendLine("<size=70%>КОРОНА, МАСКА И ЦЕПЬ НАДЕВАЮТСЯ ВМЕСТЕ</size>");
                 break;
             case "CREDITS":

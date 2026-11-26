@@ -41,6 +41,48 @@ public class BusPortal : MonoBehaviour
         if (insideMask) insideMask.forceRenderingOff = !IsInside(cam);
     }
 
+    // ------------------------------------------------------------------ гориллы в салоне
+    // Салон длиннее кузова и уходит в тоннель перед капотом: горилла в глубине салона снаружи стояла бы
+    // в тоннеле. Пока голова гориллы в салоне, её рендеры (кроме своей головы LocalHead) переходят на слой
+    // BusInterior — их видно только сквозь проём и изнутри, как сам салон.
+    [Tooltip("Слой салона (BusInterior)")]
+    public int interiorLayer = 11;
+    readonly System.Collections.Generic.Dictionary<Renderer, int> movedRenderers = new System.Collections.Generic.Dictionary<Renderer, int>();
+    readonly System.Collections.Generic.List<GorillaFinalRig> rigs = new System.Collections.Generic.List<GorillaFinalRig>();
+    readonly System.Collections.Generic.HashSet<GorillaFinalRig> insideRigs = new System.Collections.Generic.HashSet<GorillaFinalRig>();
+    float nextScan;
+
+    public bool IsInsideWorld(Vector3 world)
+    {
+        Vector3 p = transform.InverseTransformPoint(world);
+        return p.z > doorZ + 0.05f && p.z < interiorEndZ && Mathf.Abs(p.x) < halfWidth + 0.1f && p.y > floorY - 0.5f && p.y < ceilingY + 0.5f;
+    }
+
+    void LateUpdate()
+    {
+        if (!Application.isPlaying) return;
+        if (Time.unscaledTime > nextScan)
+        {
+            nextScan = Time.unscaledTime + 1f;
+            rigs.Clear();
+            rigs.AddRange(FindObjectsByType<GorillaFinalRig>());
+        }
+        int localHead = LayerMask.NameToLayer("LocalHead");
+        foreach (var rig in rigs)
+        {
+            if (!rig || !rig.headBone) continue;
+            bool inside = rig.isActiveAndEnabled && IsInsideWorld(rig.headBone.position);
+            if (inside == insideRigs.Contains(rig)) continue;
+            if (inside) insideRigs.Add(rig); else insideRigs.Remove(rig);
+            foreach (var r in rig.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r.gameObject.layer == localHead || r.GetComponent<Collider>()) continue;
+                if (inside) { if (!movedRenderers.ContainsKey(r)) movedRenderers[r] = r.gameObject.layer; r.gameObject.layer = interiorLayer; }
+                else if (movedRenderers.TryGetValue(r, out int was)) { r.gameObject.layer = was; movedRenderers.Remove(r); }
+            }
+        }
+    }
+
     /// Камера в салоне? Возле проёма запас на ближнюю плоскость отсечения: пока голова проходит
     /// сквозь проём, маска проёма уже обрезана камерой — салон держит маска изнутри.
     public bool IsInside(Camera cam)

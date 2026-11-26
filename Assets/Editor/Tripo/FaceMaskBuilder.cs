@@ -28,7 +28,15 @@ public static class FaceMaskBuilder
     const string HubPath = "Assets/Scenes/MainHub.unity";
     const string HeistPath = "Assets/Scenes/HeistLevel_Test.unity";
     const string MeshDir = "Assets/Art/Meshes/Cosmetics";
-    const string MatPath = "Assets/Art/Materials/Player/M_Cos_FaceMask.mat";
+    const string MatDir = "Assets/Art/Materials/Player";
+    const string TexDir = "Assets/Art/Textures/Cosmetics";
+
+    /// Два цвета вязаной балаклавы (оба — слот FaceMask, носятся с любым головным убором).
+    static readonly (string id, Color fabric, Color seam, string matKey)[] Variants =
+    {
+        ("RobberMask", new Color32(0x16, 0x16, 0x1A, 0xFF), new Color32(0x3A, 0x3A, 0x42, 0xFF), "Black"),
+        ("RobberMaskWhite", new Color32(0xEA, 0xEA, 0xEF, 0xFF), new Color32(0xC4, 0xC4, 0xCC, 0xFF), "White"),
+    };
 
     // ---- разметка лица в осях корня префаба VRGorillaPlayer (снята с фронтального снимка головы)
     const float Cx = 0.004f;                                   // середина лица по X
@@ -36,9 +44,10 @@ public static class FaceMaskBuilder
     const float EyeA = 0.043f, EyeB = 0.026f;                  // полуоси прорези глаза (белок 0.040 × 0.024)
     static readonly Vector2 Mouth = new Vector2(Cx, 1.314f);
     const float MouthA = 0.084f, MouthB = 0.019f;              // щель по линии губ
-    const float Lift = 0.005f;                                 // ткань над кожей
+    const float Lift = 0.0075f;                                // ткань над кожей: объёмно и без клиппинга
     const float Step = 0.006f;                                 // шаг сетки
-    const float RimR = 0.0035f;                                // радиус окантовки
+    const float RimR = 0.0048f;                                // радиус прошитой окантовки
+    const float RibTiling = 5f;                                // рубчик ~4 мм (UV-единица = 1/6 м, в текстуре 8 рёбер)
 
     static readonly StringBuilder log = new StringBuilder();
 
@@ -56,8 +65,8 @@ public static class FaceMaskBuilder
     public static string Run()
     {
         log.Clear().AppendLine("[FaceMaskBuilder]");
-        MapKit.EnsureFolder(MeshDir);
-        var mat = Material();
+        MapKit.EnsureFolder(MeshDir); MapKit.EnsureFolder(TexDir);
+        var mat = Variants.Select(v => Materials(v.matKey, v.fabric, v.seam)).ToArray();
         Mesh headLocalMesh = null, faceMesh = null;
 
         // 1) меш маски — по голове VR-игрока
@@ -100,21 +109,99 @@ public static class FaceMaskBuilder
         return log.ToString();
     }
 
-    // =========================================================================== материал
-    static Material Material()
+    // =========================================================================== материалы: вязаный рубчик + прошитый шов
+    /// [0] — ткань (вертикальный трикотажный рубчик: albedo + normal map), [1] — окантовка со стежками.
+    static Material[] Materials(string key, Color fabric, Color seam)
     {
+        var knitA = Tex("T_Knit_Rib_Albedo", false, KnitAlbedo);
+        var knitN = Tex("T_Knit_Rib_Normal", true, KnitNormal);
+        var seamA = Tex("T_Knit_Seam_Albedo", false, SeamAlbedo);
+        var seamN = Tex("T_Knit_Seam_Normal", true, SeamNormal);
+        return new[]
+        {
+            Lit($"M_Cos_Balaclava_{key}", fabric, knitA, knitN, new Vector2(RibTiling, RibTiling), 0.9f, 0.12f),
+            Lit($"M_Cos_Balaclava_{key}_Seam", seam, seamA, seamN, new Vector2(10f, 1f), 0.7f, 0.18f),
+        };
+    }
+
+    static Material Lit(string name, Color c, Texture2D albedo, Texture2D normal, Vector2 tiling, float bump, float smooth)
+    {
+        string path = $"{MatDir}/{name}.mat";
         var sh = Shader.Find("Universal Render Pipeline/Lit");
-        var m = AssetDatabase.LoadAssetAtPath<Material>(MatPath);
-        if (!m) { m = new Material(sh); AssetDatabase.CreateAsset(m, MatPath); }
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (!m) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
         m.shader = sh;
-        m.SetColor("_BaseColor", new Color(0.045f, 0.045f, 0.052f));   // чёрная плотная ткань
+        m.SetColor("_BaseColor", c);
+        m.SetTexture("_BaseMap", albedo); m.SetTextureScale("_BaseMap", tiling);
+        m.SetTexture("_BumpMap", normal); m.SetTextureScale("_BumpMap", tiling);
+        m.SetFloat("_BumpScale", bump); m.EnableKeyword("_NORMALMAP");
         m.SetFloat("_Metallic", 0f);
-        m.SetFloat("_Smoothness", 0.22f);
+        m.SetFloat("_Smoothness", smooth);
         m.SetFloat("_Cull", 0f);                                        // двусторонняя: край ткани не просвечивает
         m.doubleSidedGI = true;
         m.SetFloat("_EnvironmentReflections", 0f); m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
         EditorUtility.SetDirty(m);
         return m;
+    }
+
+    const int TexN = 128;
+
+    // высота трикотажа: 8 вертикальных рёбер, в каждом — «косички» петель (V-образный рисунок вязки)
+    static float KnitHeight(float u, float v)
+    {
+        float rib = u * 8f, f = rib - Mathf.Floor(rib);                 // 0..1 поперёк ребра
+        float ribH = Mathf.Sin(f * Mathf.PI);                           // выпуклое ребро
+        float loop = v * 32f + Mathf.Abs(f - 0.5f) * 1.6f;              // V-петли вдоль ребра
+        float loopH = 0.5f + 0.5f * Mathf.Cos(loop * Mathf.PI * 2f);
+        return ribH * (0.75f + 0.25f * loopH);
+    }
+
+    static Color KnitAlbedo(float u, float v)
+    {
+        float h = KnitHeight(u, v);
+        float k = 0.62f + 0.38f * h;                                    // ложбинки темнее → полоски читаются при любом свете
+        return new Color(k, k, k, 1);
+    }
+
+    static Color KnitNormal(float u, float v) => HeightToNormal(KnitHeight, u, v, 2.2f);
+
+    // шов: тёмная ложбинка вдоль трубки + короткие светлые стежки поперёк
+    static float SeamHeight(float u, float v)
+    {
+        float s = u - Mathf.Floor(u);
+        float stitch = s > 0.15f && s < 0.75f ? 1f : 0f;
+        return stitch * (0.6f + 0.4f * Mathf.Sin(v * Mathf.PI));
+    }
+
+    static Color SeamAlbedo(float u, float v) { float k = 0.55f + 0.45f * SeamHeight(u, v); return new Color(k, k, k, 1); }
+    static Color SeamNormal(float u, float v) => HeightToNormal(SeamHeight, u, v, 1.5f);
+
+    static Color HeightToNormal(System.Func<float, float, float> h, float u, float v, float strength)
+    {
+        float e = 1f / TexN;
+        float dx = (h(u + e, v) - h(u - e, v)) * strength;
+        float dy = (h(u, v + e) - h(u, v - e)) * strength;
+        var n = new Vector3(-dx, -dy, 1f).normalized;
+        return new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1);
+    }
+
+    static Texture2D Tex(string name, bool normal, System.Func<float, float, Color> fn)
+    {
+        string path = $"{TexDir}/{name}.png";
+        var t = new Texture2D(TexN, TexN, TextureFormat.RGB24, false, normal);
+        for (int y = 0; y < TexN; y++)
+            for (int x = 0; x < TexN; x++) t.SetPixel(x, y, fn((x + 0.5f) / TexN, (y + 0.5f) / TexN));
+        t.Apply();
+        System.IO.File.WriteAllBytes(path, t.EncodeToPNG());
+        Object.DestroyImmediate(t);
+        AssetDatabase.ImportAsset(path);
+        var imp = (TextureImporter)AssetImporter.GetAtPath(path);
+        imp.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+        imp.sRGBTexture = !normal;
+        imp.wrapMode = TextureWrapMode.Repeat; imp.filterMode = FilterMode.Bilinear;
+        imp.maxTextureSize = TexN; imp.mipmapEnabled = true;
+        imp.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     // =========================================================================== контуры (плоскость лица)
@@ -291,7 +378,7 @@ public static class FaceMaskBuilder
                 // лицевая сторона смотрит вперёд (+Z)
                 tri.AddRange(new[] { a, b, d, a, d, e });
             }
-        int fabricVerts = verts.Count;
+        int fabricVerts = verts.Count, fabricTris = tri.Count;
 
         // ---- окантовка по краю и вокруг прорезей
         int rims = 0;
@@ -307,7 +394,10 @@ public static class FaceMaskBuilder
         }
 
         var face = new Mesh { name = "Cos_FaceMask_Face", indexFormat = IndexFormat.UInt32 };
-        face.SetVertices(verts); face.SetUVs(0, uvs); face.SetTriangles(tri, 0);
+        face.SetVertices(verts); face.SetUVs(0, uvs);
+        face.subMeshCount = 2;                                           // 0 — вязаная ткань, 1 — прошитая окантовка
+        face.SetTriangles(tri.GetRange(0, fabricTris), 0);
+        face.SetTriangles(tri.GetRange(fabricTris, tri.Count - fabricTris), 1);
         face.RecalculateNormals(); face.RecalculateBounds();
         log.AppendLine($"  mask: grid {nx}×{ny}, fabric verts {fabricVerts}, total verts {verts.Count}, tris {tri.Count / 3}, rims {rims}, bounds {face.bounds.min:F3}..{face.bounds.max:F3}");
 
@@ -374,38 +464,53 @@ public static class FaceMaskBuilder
             existing.Clear();
             existing.indexFormat = mesh.indexFormat;
             existing.SetVertices(mesh.vertices); existing.SetNormals(mesh.normals); existing.SetUVs(0, mesh.uv);
-            existing.SetTriangles(mesh.triangles, 0);
-            existing.RecalculateBounds();
+            existing.subMeshCount = mesh.subMeshCount;
+            for (int s = 0; s < mesh.subMeshCount; s++) existing.SetTriangles(mesh.GetTriangles(s), s);
+            existing.RecalculateBounds(); existing.RecalculateTangents();
             EditorUtility.SetDirty(existing);
             Object.DestroyImmediate(mesh);
             return existing;
         }
+        mesh.RecalculateTangents();
         AssetDatabase.CreateAsset(mesh, path);
         return mesh;
     }
 
     // =========================================================================== установка
     /// RobberMask под костью Head: старые части (повязка, узел) убираются, ставится новая маска.
-    static void Apply(GorillaFinalRig rig, Mesh mesh, Material mat, string who)
+    /// Чёрная (RobberMask) и белая (RobberMaskWhite) балаклавы под костью Head; белая создаётся рядом
+    /// с чёрной (тот же слой) и добавляется в PlayerCosmetics.items.
+    static void Apply(GorillaFinalRig rig, Mesh mesh, Material[][] mats, string who)
     {
         var head = rig.headBone;
         var cos = rig.GetComponent<PlayerCosmetics>();
-        var mask = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "RobberMask");
-        if (!mask || !head) { log.AppendLine($"  ERROR: {who}: RobberMask/head not found"); return; }
-        bool wasActive = mask.gameObject.activeSelf;
-        int layer = mask.gameObject.layer;
-        mask.SetParent(head, false);
-        mask.localPosition = Vector3.zero; mask.localRotation = Quaternion.identity; mask.localScale = Vector3.one;
-        foreach (Transform c in mask.Cast<Transform>().ToArray()) Object.DestroyImmediate(c.gameObject);
-        var go = new GameObject("FaceMask");
-        go.transform.SetParent(mask, false);
-        go.layer = layer;
-        go.AddComponent<MeshFilter>().sharedMesh = mesh;
-        var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = mat;
-        r.shadowCastingMode = ShadowCastingMode.Off;
-        mask.gameObject.SetActive(wasActive);
-        if (cos && (cos.items == null || !cos.items.Contains(mask.gameObject))) log.AppendLine($"  WARN: {who}: RobberMask not in PlayerCosmetics.items");
+        var black = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "RobberMask");
+        if (!black || !head) { log.AppendLine($"  ERROR: {who}: RobberMask/head not found"); return; }
+        int layer = black.gameObject.layer;
+        for (int vi = 0; vi < Variants.Length; vi++)
+        {
+            var id = Variants[vi].id;
+            var t = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(x => x.name == id);
+            if (!t) { t = new GameObject(id).transform; t.gameObject.SetActive(false); }
+            bool wasActive = t.gameObject.activeSelf;
+            t.SetParent(head, false);
+            t.gameObject.layer = layer;
+            t.localPosition = Vector3.zero; t.localRotation = Quaternion.identity; t.localScale = Vector3.one;
+            foreach (Transform c in t.Cast<Transform>().ToArray()) Object.DestroyImmediate(c.gameObject);
+            var go = new GameObject("FaceMask");
+            go.transform.SetParent(t, false);
+            go.layer = layer;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterials = mats[vi];
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            t.gameObject.SetActive(wasActive);
+            if (cos)
+            {
+                var items = (cos.items ?? new GameObject[0]).Where(x => x).ToList();
+                if (!items.Contains(t.gameObject)) { items.Add(t.gameObject); cos.items = items.ToArray(); EditorUtility.SetDirty(cos); }
+            }
+        }
         // проверка посадки: корона и маска не пересекаются
         var crown = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Crown");
         string fit = "";
@@ -420,19 +525,22 @@ public static class FaceMaskBuilder
         log.AppendLine($"  {who}: mask installed (layer {LayerMask.LayerToName(layer)}){fit}");
     }
 
-    /// Образец на витрине косметики в хабе (Sample_1) — та же маска, уменьшенная.
-    static void ShowcaseSample(Mesh face, Material mat)
+    /// Образцы на витрине косметики в хабе: Sample_1 — чёрная, Sample_3 — белая балаклава (уменьшенные).
+    static void ShowcaseSample(Mesh face, Material[][] mats)
     {
-        var sample = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include).FirstOrDefault(t => t.name == "Sample_1" && t.parent && t.parent.name == "CosmeticShowcase");
-        if (!sample) { log.AppendLine("  showcase sample not found — skipped"); return; }
-        foreach (Transform c in sample.Cast<Transform>().ToArray()) Object.DestroyImmediate(c.gameObject);
-        var go = new GameObject("FaceMaskSample");
-        go.transform.SetParent(sample, false);
-        go.transform.localPosition = new Vector3(0, 0.05f, 0);
-        go.transform.localScale = Vector3.one * 0.6f;
-        go.AddComponent<MeshFilter>().sharedMesh = face;
-        go.AddComponent<MeshRenderer>().sharedMaterial = mat;
-        log.AppendLine("  showcase sample replaced");
+        foreach (var (sampleName, vi) in new[] { ("Sample_1", 0), ("Sample_3", 1) })
+        {
+            var sample = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include).FirstOrDefault(t => t.name == sampleName && t.parent && t.parent.name == "CosmeticShowcase");
+            if (!sample) { log.AppendLine($"  showcase {sampleName} not found — skipped"); continue; }
+            foreach (Transform c in sample.Cast<Transform>().ToArray()) Object.DestroyImmediate(c.gameObject);
+            var go = new GameObject("FaceMaskSample");
+            go.transform.SetParent(sample, false);
+            go.transform.localPosition = new Vector3(0, 0.05f, 0);
+            go.transform.localScale = Vector3.one * 0.6f;
+            go.AddComponent<MeshFilter>().sharedMesh = face;
+            go.AddComponent<MeshRenderer>().sharedMaterials = mats[vi];
+            log.AppendLine($"  showcase {sampleName}: {Variants[vi].id}");
+        }
     }
 
     // =========================================================================== превью
