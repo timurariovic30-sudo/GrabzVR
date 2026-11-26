@@ -128,3 +128,9 @@ __pycache__/
 
 # превью Хаба (Tools/Heist/Hub/Capture Preview)
 HubPreview/
+
+# Photon Fusion: папки с установочными .unitypackage демо/меню (сами пакеты не храним)
+Assets/Photon/FusionDemos/
+Assets/Photon/FusionDemos.meta
+Assets/Photon/FusionMenu/
+Assets/Photon/FusionMenu.meta
