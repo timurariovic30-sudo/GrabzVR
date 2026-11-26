@@ -524,7 +524,9 @@ public static class HubVisualOverhaul
     static void BuildWindows(Transform st)
     {
         var g = Group(st, "Windows");
-        foreach (float x in new[] { -2f, 3f, 8f })
+        // окно левее стартовой таблички: его луч больше не засвечивает её текст (HubSpawnWindowFix)
+        Window(g, "Window_S", HubSpawnWindowFix.WallPoint, Vector3.forward, HubSpawnWindowFix.FloorTarget);
+        foreach (float x in new[] { 3f, 8f })
             Window(g, "Window_S", new Vector3(x, 6.7f, -9.78f), Vector3.forward, new Vector3(x + 0.8f, 0f, -5.2f));
         Window(g, "Window_W", new Vector3(-11.78f, 6.7f, 10f), Vector3.right, new Vector3(-7.4f, 0f, 10.6f));
         Window(g, "Window_E", new Vector3(11.78f, 6.7f, 10f), Vector3.left, new Vector3(7.5f, 3.5f, 9.4f));

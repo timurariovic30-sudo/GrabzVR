@@ -64,24 +64,32 @@ public class HubController : MonoBehaviour
     public void TryOnRobberMask() => TryOn("RobberMask");
     public void TryOnGoldChain() => TryOn("GoldChain");
 
-    /// Повторное нажатие той же кнопки снимает предмет.
+    /// Повторное нажатие той же кнопки снимает предмет. Головной убор, маска и цепь — разные слоты
+    /// и носятся вместе; новый предмет снимает только старый из своего слота.
     public void TryOn(string id)
     {
-        GameSession.Cosmetic = GameSession.Cosmetic == id ? "" : id;
+        GameSession.ToggleCosmetic(id);
         foreach (var pc in FindObjectsByType<PlayerCosmetics>(FindObjectsInactive.Include)) pc.Apply();
         ShowCosmetic();
     }
 
+    public static string CosmeticName(string id) => id switch
+    {
+        "Crown" => "КОРОНА",
+        "RobberMask" => "МАСКА ГРАБИТЕЛЯ",
+        "GoldChain" => "ЗОЛОТАЯ ЦЕПЬ",
+        _ => id,
+    };
+
+    /// «НА ТЕБЕ: КОРОНА + МАСКА ГРАБИТЕЛЯ» или подсказка, если ничего не надето.
+    public static string WornSummary(string empty)
+    {
+        var worn = GameSession.WornCosmetics;
+        return worn.Length == 0 ? empty : "НА ТЕБЕ: " + string.Join(" + ", System.Array.ConvertAll(worn, CosmeticName));
+    }
+
     void ShowCosmetic()
     {
-        if (!cosmeticStatus) return;
-        string c = GameSession.Cosmetic;
-        cosmeticStatus.text = c switch
-        {
-            "Crown" => "НА ТЕБЕ: КОРОНА",
-            "RobberMask" => "НА ТЕБЕ: МАСКА ГРАБИТЕЛЯ",
-            "GoldChain" => "НА ТЕБЕ: ЗОЛОТАЯ ЦЕПЬ",
-            _ => "ПРИМЕРЬ! (ПОСМОТРИ В ЗЕРКАЛО)",
-        };
+        if (cosmeticStatus) cosmeticStatus.text = WornSummary("ПРИМЕРЬ! (ПОСМОТРИ В ЗЕРКАЛО)");
     }
 }

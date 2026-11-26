@@ -43,10 +43,42 @@ public static class GameSession
 
     public static string ModeTitle => ModeTitles[(int)CurrentMode];
 
-    /// Примеренная косметика ("" = ничего).
+    /// Надетая косметика: id через запятую ("" = ничего), например "Crown,RobberMask".
+    /// В каждом слоте (CosmeticSlot) — не больше одного предмета; предметы из разных слотов носятся вместе.
     public static string Cosmetic
     {
         get => PlayerPrefs.GetString(CosmeticKey, "");
         set { PlayerPrefs.SetString(CosmeticKey, value ?? ""); PlayerPrefs.Save(); }
+    }
+
+    // --------------------------------------------------------------- слоты косметики
+    /// Headwear — головные уборы (корона, шапки), FaceMask — маски на лицо, Neck — шея/грудь (цепь).
+    public enum CosmeticSlot { Headwear, FaceMask, Neck }
+
+    public static CosmeticSlot SlotOf(string id) => id switch
+    {
+        "RobberMask" => CosmeticSlot.FaceMask,
+        "GoldChain" => CosmeticSlot.Neck,
+        _ => CosmeticSlot.Headwear,       // Crown и будущие шапки
+    };
+
+    public static string[] ParseCosmetics(string list) =>
+        string.IsNullOrEmpty(list) ? new string[0] : list.Split(',', System.StringSplitOptions.RemoveEmptyEntries);
+
+    public static string[] WornCosmetics => ParseCosmetics(Cosmetic);
+
+    public static bool IsWorn(string id) => System.Array.IndexOf(WornCosmetics, id) >= 0;
+
+    /// Надеть/снять: повторное нажатие снимает; новый предмет заменяет только предмет из того же слота.
+    public static void ToggleCosmetic(string id)
+    {
+        var worn = new System.Collections.Generic.List<string>(WornCosmetics);
+        bool wasWorn = worn.Remove(id);
+        if (!wasWorn)
+        {
+            worn.RemoveAll(w => SlotOf(w) == SlotOf(id));
+            worn.Add(id);
+        }
+        Cosmetic = string.Join(",", worn);
     }
 }

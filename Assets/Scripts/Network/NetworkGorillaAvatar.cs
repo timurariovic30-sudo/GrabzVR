@@ -27,7 +27,22 @@ public class NetworkGorillaAvatar : NetworkBehaviour
     [Networked] public float LeftTrigger { get; set; }
     [Networked] public float RightGrip { get; set; }
     [Networked] public float RightTrigger { get; set; }
+    /// Битовая маска надетой косметики: бит (i − 1) ↔ CosmeticIds[i] (корона + маска + цепь — одновременно).
     [Networked] public int Cosmetic { get; set; }
+
+    static int EncodeCosmetics(string[] worn)
+    {
+        int mask = 0;
+        for (int i = 1; i < CosmeticIds.Length; i++) if (System.Array.IndexOf(worn, CosmeticIds[i]) >= 0) mask |= 1 << (i - 1);
+        return mask;
+    }
+
+    static string DecodeCosmetics(int mask)
+    {
+        var list = new System.Collections.Generic.List<string>();
+        for (int i = 1; i < CosmeticIds.Length; i++) if ((mask & (1 << (i - 1))) != 0) list.Add(CosmeticIds[i]);
+        return string.Join(",", list);
+    }
     [Networked] public NetworkString<_16> Nick { get; set; }
 
     [Header("Ссылки (заполняет билдер)")]
@@ -84,7 +99,7 @@ public class NetworkGorillaAvatar : NetworkBehaviour
 
         var localSkin = r.GetComponentInParent<PlayerSkinController>();
         if (localSkin) FurRGB = new Vector3(localSkin.furColor.r, localSkin.furColor.g, localSkin.furColor.b);
-        Cosmetic = Mathf.Max(0, System.Array.IndexOf(CosmeticIds, GameSession.Cosmetic));
+        Cosmetic = EncodeCosmetics(GameSession.WornCosmetics);
         Nick = GrabzSettings.PlayerName;
 
         var pose = r.GetComponentInParent<VRHandPoseController>();
@@ -130,7 +145,7 @@ public class NetworkGorillaAvatar : NetworkBehaviour
         {
             shownCosmetic = Cosmetic;
             cosmetics.useNetworkId = true;
-            cosmetics.networkId = CosmeticIds[Mathf.Clamp(Cosmetic, 0, CosmeticIds.Length - 1)];
+            cosmetics.networkId = DecodeCosmetics(Cosmetic);
             cosmetics.Apply();
         }
         if (hands)

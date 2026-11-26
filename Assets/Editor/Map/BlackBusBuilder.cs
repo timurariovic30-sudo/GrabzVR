@@ -49,6 +49,13 @@ public static class BlackBusBuilder
     const float NorthWallInnerZ = 13.8f;
     static readonly Vector3 BusPos = new Vector3(4.2f, 0f, NorthWallInnerZ - 0.12f - FrontZ); // нос в 12 см от стены
 
+    // ---- синяя подсветка салона: насыщенный глубокий сапфир/кобальт, на 25–30% темнее первой версии
+    // (была #1E90FF, 2.4). Цвет лампы — оттенок #07358C, приведённый к полной яркости (иначе тёмный цвет
+    // лампы гасит свет вдвое сильнее, чем нужно); яркость −28%. Неон — #07358C с HDR-запасом под Bloom.
+    static readonly Color LightCobalt = new Color(0.05f, 0.38f, 1f);    // тон #07358C (0.027, 0.208, 0.549) / 0.549
+    const float LightIntensity = 1.73f;                                // 2.4 × 0.72
+    static readonly Color NeonCobalt = new Color(0.027f, 0.208f, 0.549f) * 1.6f;   // макс. канал 0.88 (было 1.25) → −30%
+
     static readonly StringBuilder log = new StringBuilder();
     static Material mBody, mGlass, mTire, mRim, mLed, mTail, mWall, mFloor, mNeon, mMask, mStep;
 
@@ -194,7 +201,8 @@ public static class BlackBusBuilder
         mLed = Glow("M_Bus_LED", new Color(3.2f, 3.2f, 3.4f));
         mTail = Glow("M_Bus_TailLED", new Color(2.4f, 0.06f, 0.05f));
         // #0077FF / #1E90FF с запасом яркости под Bloom; зелёный канал приглушён, иначе тонмаппинг уводит в бирюзу
-        mNeon = Glow("M_Bus_NeonBlue", new Color(0.02f, 0.38f, 1f) * 1.25f);
+        // глубокий сапфирово-кобальтовый (#07358C) и на ~30% темнее прежнего (было (0.02, 0.38, 1) × 1.25)
+        mNeon = Glow("M_Bus_NeonBlue", NeonCobalt);
         mWall = Lit("M_Bus_InteriorWall", Hex("#101014"), 0.1f, 0.5f, envReflections: false);
         mFloor = Lit("M_Bus_InteriorFloor", Color.white, 0.2f, 0.35f, null, FloorTexture(), new Vector2(2f, 2f), envReflections: false);
 
@@ -761,11 +769,10 @@ public static class BlackBusBuilder
 
         // мягкий синий свет: только салон и игроки (на соседний пол хаба не «протекает»)
         int mask = (1 << lInt) | (1 << LayerMask.NameToLayer("Player")) | (1 << LayerMask.NameToLayer("LocalHead"));
-        var lightColor = Hex("#1E90FF");
         int li = 0;
         foreach (float lz in new[] { -1.9f, 0.9f, 3.7f, 6.5f })
         {
-            var l = MapKit.PointLight(inside, $"BlueLight_{li++}", new Vector3(0, CeilY - 0.3f, lz), lightColor, 2.4f, 3.4f);
+            var l = MapKit.PointLight(inside, $"BlueLight_{li++}", new Vector3(0, CeilY - 0.3f, lz), LightCobalt, LightIntensity, 3.4f);
             l.cullingMask = mask;
             l.renderMode = LightRenderMode.Auto;
         }
@@ -906,6 +913,12 @@ public static class BlackBusBuilder
         {
             hint.text = hint.text.Replace("ЗАПРЫГНИ В ФУРГОН", "ЗАЙДИ В АВТОБУС").Replace("ЗАЙДИ В ЧЁРНЫЙ АВТОБУС", "ЗАЙДИ В АВТОБУС");
             EditorUtility.SetDirty(hint);
+        }
+        // стартовая табличка у спавна тоже говорила про фургон
+        foreach (var t in map.GetComponentsInChildren<TextMeshPro>(true).Where(t => t.text.Contains("ЗАПРЫГНИ В ФУРГОН")))
+        {
+            t.text = t.text.Replace("ЗАПРЫГНИ В ФУРГОН", "ЗАЙДИ В АВТОБУС");
+            EditorUtility.SetDirty(t);
         }
         log.AppendLine($"  VanPortal zone {box.size:F2} at {vp.transform.position:F2}; countdown on the far wall");
     }

@@ -161,10 +161,10 @@ public class GrabzComputer : MonoBehaviour
 
     void ToggleItem(string id)
     {
-        GameSession.Cosmetic = GameSession.Cosmetic == id ? "" : id;
+        GameSession.ToggleCosmetic(id);   // корона и маска — разные слоты, носятся вместе
         foreach (var pc in FindObjectsByType<PlayerCosmetics>(FindObjectsInactive.Include)) pc.Apply();
         var hub = FindAnyObjectByType<HubController>();
-        if (hub && hub.cosmeticStatus) hub.cosmeticStatus.text = GameSession.Cosmetic == "" ? "НИЧЕГО НЕ НАДЕТО" : "НА ТЕБЕ: " + ItemNames[System.Array.IndexOf(ItemIds, id)];
+        if (hub && hub.cosmeticStatus) hub.cosmeticStatus.text = HubController.WornSummary("НИЧЕГО НЕ НАДЕТО");
     }
 
     void Status(string s) { status = s; statusUntil = Time.time + 4f; }
@@ -245,7 +245,8 @@ public class GrabzComputer : MonoBehaviour
                 break;
             case "ITEMS":
                 for (int i = 0; i < 3; i++)
-                    s.AppendLine((GameSession.Cosmetic == ItemIds[i] ? "> " : "  ") + $"OPTION {i + 1}: {ItemNames[i]}" + (GameSession.Cosmetic == ItemIds[i] ? "  [НАДЕТО]" : ""));
+                    s.AppendLine((GameSession.IsWorn(ItemIds[i]) ? "> " : "  ") + $"OPTION {i + 1}: {ItemNames[i]}" + (GameSession.IsWorn(ItemIds[i]) ? "  [НАДЕТО]" : ""));
+                s.AppendLine("<size=70%>КОРОНА, МАСКА И ЦЕПЬ НАДЕВАЮТСЯ ВМЕСТЕ</size>");
                 break;
             case "CREDITS":
                 s.AppendLine("GRABZ VR — КООП-ОГРАБЛЕНИЕ ОБЕЗЬЯН");
