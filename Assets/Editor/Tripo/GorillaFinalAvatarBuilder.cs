@@ -339,9 +339,9 @@ public static class GorillaFinalAvatarBuilder
             rig.eyeLocal = Vector3.zero;
             rig.headBone = B("Head");
             float palm = Vector3.Distance(lH.position, B("Left_MiddleProximal").position) * 0.9f;
-            rig.left = new GorillaFinalRig.Limb { upper = lU, lower = lL, hand = lH, side = -1f, palmOffset = palm,
+            rig.left = new GorillaFinalRig.Limb { upper = lU, lower = lL, hand = lH, side = -1f, palmOffset = palm, rotationOffset = new Vector3(0, 0, -90),
                 target = gp ? gp.leftHandFollower : null, rotationSource = offset.Find("Left Controller") };
-            rig.right = new GorillaFinalRig.Limb { upper = rU, lower = rL, hand = rH, side = 1f, palmOffset = palm,
+            rig.right = new GorillaFinalRig.Limb { upper = rU, lower = rL, hand = rH, side = 1f, palmOffset = palm, rotationOffset = new Vector3(0, 0, -66), // у правой кисти Tripo-рига оси перевёрнуты
                 target = gp ? gp.rightHandFollower : null, rotationSource = offset.Find("Right Controller") };
 
             // ---- косметика на костях
@@ -358,6 +358,7 @@ public static class GorillaFinalAvatarBuilder
             skinCtl.presets[0] = furDefault;
 
             BuildWristDisplay(offset.Find("Left Controller"), playerLayer);
+            if (!root.GetComponent<GorillaStickTurn>()) root.AddComponent<GorillaStickTurn>(); // поворот стиком (GRABZ OS → TURN)
 
             cam.cullingMask &= ~(1 << localHead);
             cam.nearClipPlane = 0.01f;
@@ -443,6 +444,7 @@ public static class GorillaFinalAvatarBuilder
         rt.localScale = Vector3.one * 0.00025f;               // 420 px → 10.5 см
         var canvas = go.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = leftController.parent ? leftController.parent.GetComponentInChildren<Camera>(true) : null; // Event Camera
         canvas.sortingOrder = 10;
 
         var bg = new GameObject("Back", typeof(RectTransform), typeof(UnityEngine.UI.Image));

@@ -369,6 +369,9 @@ public static class MapKit
         rt.sizeDelta = rect;
         // У RectTransform в сцену сохраняется anchoredPosition, а не localPosition: если задать только
         // localPosition, после перезагрузки сцены X/Y сбрасываются в 0 и надписи «падают» на пол.
+        // +1 см к зрителю (TMP читается со стороны -forward): текст не утоплен в табличку → нет z-fighting
+        // и «двоения» в стерео, когда каждый глаз видит табличку под своим углом
+        pos += rot * Vector3.back * 0.01f;
         rt.anchoredPosition3D = pos;
         rt.localPosition = pos;
         go.transform.localRotation = rot;

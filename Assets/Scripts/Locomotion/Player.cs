@@ -81,6 +81,32 @@ namespace GorillaLocomotion
             lastPosition = transform.position;
         }
 
+        // [local] поворот игрока стиком (GRABZ OS → TURN): крутим корень вокруг точки (головы) и вместе с ним
+        // все запомненные позиции рук/головы и историю скоростей — иначе движок посчитает поворот рывком руки.
+        public void TurnAround(Vector3 pivot, float angle)
+        {
+            if (Mathf.Approximately(angle, 0f)) return;
+            var q = Quaternion.AngleAxis(angle, Vector3.up);
+            Vector3 R(Vector3 p) => pivot + q * (p - pivot);
+            transform.SetPositionAndRotation(R(transform.position), q * transform.rotation);
+            if (playerRigidBody)
+            {
+                playerRigidBody.position = transform.position;
+                playerRigidBody.rotation = transform.rotation;
+                playerRigidBody.linearVelocity = q * playerRigidBody.linearVelocity;
+            }
+            lastLeftHandPosition = R(lastLeftHandPosition);
+            lastRightHandPosition = R(lastRightHandPosition);
+            lastHeadPosition = R(lastHeadPosition);
+            lastPosition = R(lastPosition);
+            leftHandFollower.position = R(leftHandFollower.position);
+            rightHandFollower.position = R(rightHandFollower.position);
+            if (velocityHistory != null)
+                for (int i = 0; i < velocityHistory.Length; i++) velocityHistory[i] = q * velocityHistory[i];
+            currentVelocity = q * currentVelocity;
+            denormalizedVelocityAverage = q * denormalizedVelocityAverage;
+        }
+
         private Vector3 CurrentLeftHandPosition()
         {
             if ((PositionWithOffset(leftHandTransform, leftHandOffset) - headCollider.transform.position).magnitude < maxArmLength)

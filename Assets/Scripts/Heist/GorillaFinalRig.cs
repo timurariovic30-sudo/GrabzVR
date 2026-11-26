@@ -26,6 +26,9 @@ public class GorillaFinalRig : MonoBehaviour
         public float side = -1f;
         [Tooltip("Расстояние запястье → центр ладони (м)")]
         public float palmOffset = 0.08f;
+        [Tooltip("Доп. поворот кисти в осях контроллера (градусы). Подбирается так, чтобы при естественном хвате " +
+                 "контроллера перед собой ладонь обезьяны смотрела вниз. Можно крутить прямо в Play Mode.")]
+        public Vector3 rotationOffset;
 
         [HideInInspector] public Vector3 upperBindPos;
         [HideInInspector] public Quaternion upperBindRot, lowerBindRot, handBindRot;
@@ -45,6 +48,8 @@ public class GorillaFinalRig : MonoBehaviour
     public float maxStretch = 0.35f;
     [Tooltip("Куда смотрят локти (в осях корня, на единицу длины руки): x — наружу, y — вниз, z — назад")]
     public Vector3 elbowHint = new Vector3(0.6f, -1f, -0.5f);
+    [Range(0f, 1f), Tooltip("Какая доля скрутки кисти передаётся предплечью (иначе вся скрутка в запястье — «фантик»)")]
+    public float forearmTwist = 0.6f;
 
     Quaternion headBind;
     bool init;
@@ -104,7 +109,7 @@ public class GorillaFinalRig : MonoBehaviour
 
         // 2) поворот кисти = поворот контроллера
         var rotSrc = l.rotationSource ? l.rotationSource : l.target;
-        Quaternion handRot = rotSrc.rotation * l.handFromController;
+        Quaternion handRot = rotSrc.rotation * Quaternion.Euler(l.rotationOffset) * l.handFromController;
         // кость кисти направлена вдоль своей оси Y → запястье чуть позади центра ладони
         Vector3 wrist = l.target.position - handRot * Vector3.up * l.palmOffset;
 
@@ -133,6 +138,23 @@ public class GorillaFinalRig : MonoBehaviour
         l.upper.rotation = Quaternion.FromToRotation(l.lower.position - A, elbow - A) * l.upper.rotation;
         Vector3 W = A + n * d;
         l.lower.rotation = Quaternion.FromToRotation(l.hand.position - l.lower.position, W - l.lower.position) * l.lower.rotation;
+
+        // 5) скрутку кисти частично отдаём предплечью (вращение вокруг его оси не сдвигает локоть и запястье)
+        Vector3 axis = W - l.lower.position;
+        if (forearmTwist > 0f && axis.sqrMagnitude > 1e-8f)
+        {
+            axis.Normalize();
+            Quaternion delta = handRot * Quaternion.Inverse(l.lower.rotation * l.handBindRot);
+            Vector3 v = new Vector3(delta.x, delta.y, delta.z);
+            Vector3 p = Vector3.Dot(v, axis) * axis;
+            var twist = new Quaternion(p.x, p.y, p.z, delta.w);
+            float mag = Mathf.Sqrt(twist.x * twist.x + twist.y * twist.y + twist.z * twist.z + twist.w * twist.w);
+            if (mag > 1e-6f)
+            {
+                twist = new Quaternion(twist.x / mag, twist.y / mag, twist.z / mag, twist.w / mag);
+                l.lower.rotation = Quaternion.Slerp(Quaternion.identity, twist, forearmTwist) * l.lower.rotation;
+            }
+        }
         l.hand.rotation = handRot;
     }
 }

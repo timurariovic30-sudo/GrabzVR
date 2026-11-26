@@ -73,6 +73,7 @@ public static class MainHubBuilder
         BuildVan(st, dy, hub, switcher);
         BuildWardrobe(st, dy, hub);
         BuildBasketball(st, dy);
+        BuildComputer(dy, new Vector3(-5.5f, 0, -8.9f));
         BuildDecor(st);
         BuildLights(map);
 
@@ -134,7 +135,7 @@ public static class MainHubBuilder
         // Табличка у спавна
         var sign = Group(st, "RulesSign");
         sign.SetPositionAndRotation(new Vector3(-2.8f, 0, -5.2f), Quaternion.LookRotation(new Vector3(0.45f, 0, -1f)));
-        Box(sign, "Post", new Vector3(0, 0.8f, 0.05f), new Vector3(0.08f, 1.6f, 0.08f), "DarkMetal");
+        Box(sign, "Post", new Vector3(0, 0.8f, -0.07f), new Vector3(0.08f, 1.6f, 0.08f), "DarkMetal"); // за доской, не перед текстом
         Box(sign, "Board", new Vector3(0, 1.55f, 0), new Vector3(1.9f, 1.1f, 0.05f), "Cork", false);
         Text(sign, "Rules", "<b>ДОБРО ПОЖАЛОВАТЬ В УБЕЖИЩЕ!</b>\n1. СТОЛ ПЛАНИРОВАНИЯ — ВЫБЕРИ РЕЖИМ\n2. ГАРДЕРОБ СЛЕВА — ЦВЕТ, ЗЕРКАЛО, КОСМЕТИКА\n3. ЗАПРЫГНИ В ФУРГОН — ПОЕХАЛИ НА ДЕЛО!\n4. БАСКЕТБОЛ СПРАВА — РАЗМИНКА",
             1.1f, new Color(0.15f, 0.08f, 0.03f), new Vector3(0, 1.55f, 0.03f), Quaternion.Euler(0, 180, 0), new Vector2(1.75f, 0.95f), TextAlignmentOptions.Left, false);
@@ -508,6 +509,100 @@ public static class MainHubBuilder
         var go = Box(parent, name, pos, size, "Concrete");
         go.GetComponent<MeshRenderer>().sharedMaterial = mat;
         return go;
+    }
+
+    // =========================================================================== ретро-компьютер GRABZ OS
+    /// Стол + ЭЛТ-монитор + физическая клавиатура (44 клавиши). Локальная +Z смотрит на игрока.
+    static void BuildComputer(Transform dy, Vector3 pos)
+    {
+        var root = Group(dy, "GrabzComputer");
+        root.SetPositionAndRotation(pos, Quaternion.identity);
+        var beige = ColorMat("PC_Beige", new Color(0.78f, 0.74f, 0.62f), 0f);
+        var beigeDark = ColorMat("PC_BeigeDark", new Color(0.62f, 0.58f, 0.48f), 0f);
+        var crt = ColorMat("PC_CRT", new Color(0f, 0.36f, 0f), 0.55f);                 // #005500 … #007700
+        crt.SetFloat("_Smoothness", 0.1f);
+        var keyMat = ColorMat("PC_Key", new Color(0.86f, 0.84f, 0.78f), 0f);
+        var keyDark = ColorMat("PC_KeyDark", new Color(0.35f, 0.34f, 0.32f), 0f);
+        var keyGreen = ColorMat("PC_KeyEnter", new Color(0.2f, 0.75f, 0.25f), 0.15f);
+        var keyRed = ColorMat("PC_KeyDelete", new Color(0.85f, 0.2f, 0.15f), 0.15f);
+        var keyBlue = ColorMat("PC_KeyArrow", new Color(0.25f, 0.45f, 0.9f), 0.15f);
+        var keyYellow = ColorMat("PC_KeyOption", new Color(0.95f, 0.75f, 0.15f), 0.15f);
+        var led = ColorMat("PC_Led", new Color(0.3f, 1f, 0.3f), 2f);
+        Material Matte(Material m) { m.SetFloat("_Smoothness", 0.15f); return m; }
+        foreach (var m in new[] { beige, beigeDark, keyMat, keyDark, keyGreen, keyRed, keyBlue, keyYellow }) Matte(m);
+
+        // стол
+        Box(root, "Desk", new Vector3(0, 0.42f, 0), new Vector3(1.9f, 0.84f, 0.95f), "WoodDark");
+        Box(root, "DeskTrim", new Vector3(0, 0.845f, 0.47f), new Vector3(1.9f, 0.03f, 0.03f), "Brass", false);
+
+        // монитор: массивный пластиковый корпус, рамка вокруг зелёного экрана, две крутилки
+        var mon = Group(root, "Monitor");
+        Box(mon, "Stand", new Vector3(0, 0.875f, -0.24f), new Vector3(0.32f, 0.07f, 0.26f), null, false).GetComponent<Renderer>().sharedMaterial = beigeDark;
+        Box(mon, "Body", new Vector3(0, 1.24f, -0.25f), new Vector3(0.86f, 0.66f, 0.5f), null).GetComponent<Renderer>().sharedMaterial = beige;
+        Box(mon, "BackHump", new Vector3(0, 1.22f, -0.56f), new Vector3(0.6f, 0.48f, 0.24f), null, false).GetComponent<Renderer>().sharedMaterial = beigeDark;
+        foreach (var (n, p, s) in new[] {
+            ("Bezel_T", new Vector3(0, 1.515f, 0.005f), new Vector3(0.76f, 0.03f, 0.02f)), ("Bezel_B", new Vector3(0, 1.025f, 0.005f), new Vector3(0.76f, 0.03f, 0.02f)),
+            ("Bezel_L", new Vector3(-0.365f, 1.27f, 0.005f), new Vector3(0.03f, 0.52f, 0.02f)), ("Bezel_R", new Vector3(0.365f, 1.27f, 0.005f), new Vector3(0.03f, 0.52f, 0.02f)) })
+            Box(mon, n, p, s, null, false).GetComponent<Renderer>().sharedMaterial = beigeDark;
+        Box(mon, "Screen", new Vector3(0, 1.27f, 0.002f), new Vector3(0.7f, 0.46f, 0.01f), null, false).GetComponent<Renderer>().sharedMaterial = crt;
+        Box(mon, "ScreenDivider", new Vector3(0.17f, 1.27f, 0.008f), new Vector3(0.004f, 0.42f, 0.002f), null, false).GetComponent<Renderer>().sharedMaterial = led;
+        foreach (float x in new[] { -0.24f, -0.32f })
+            Cyl(mon, "Knob", new Vector3(x, 0.965f, 0.01f), 0.022f, 0.03f, "DarkMetal", false, Quaternion.Euler(90, 0, 0));
+        Sph(mon, "PowerLed", new Vector3(0.32f, 0.965f, 0.005f), Vector3.one * 0.015f, null).GetComponent<Renderer>().sharedMaterial = led;
+        Text(mon, "Brand", "GRABZ 2000", 0.35f, new Color(0.35f, 0.32f, 0.26f), new Vector3(0.12f, 0.965f, 0.0f), Facing(Vector3.forward), new Vector2(0.3f, 0.04f));
+
+        var tabs = Text(mon, "TabsText", "", 0.36f, Color.white, new Vector3(0.255f, 1.27f, 0.0f), Facing(Vector3.forward), new Vector2(0.15f, 0.42f), TextAlignmentOptions.TopLeft, false);
+        var screen = Text(mon, "ScreenText", "", 0.36f, Color.white, new Vector3(-0.095f, 1.27f, 0.0f), Facing(Vector3.forward), new Vector2(0.5f, 0.42f), TextAlignmentOptions.TopLeft, false);
+        foreach (var t in new[] { tabs, screen }) { t.fontSizeMin = 0.12f; t.textWrappingMode = TextWrappingModes.Normal; t.lineSpacing = -10f; }
+        tabs.textWrappingMode = TextWrappingModes.NoWrap; // «> CREDITS» в одну строку
+
+        var pc = root.gameObject.AddComponent<GrabzComputer>();
+        var src = root.GetComponent<AudioSource>(); src.playOnAwake = false; src.spatialBlend = 1f;
+        pc.tabsText = tabs; pc.screenText = screen;
+
+        // клавиатура (слегка наклонена к игроку)
+        var kb = Group(root, "Keyboard");
+        kb.localPosition = new Vector3(-0.08f, 0.86f, 0.2f);
+        kb.localRotation = Quaternion.Euler(7f, 0, 0);
+        Box(kb, "Base", new Vector3(0.0f, 0f, 0f), new Vector3(1.6f, 0.03f, 0.6f), null).GetComponent<Renderer>().sharedMaterial = beigeDark;
+
+        int count = 0;
+        void Key(string label, float x, float z, float w, Material mat, Color textColor)
+        {
+            var k = Group(kb, "Key_" + label.Replace(" ", ""));
+            k.localPosition = new Vector3(-x, 0.015f, z); // игрок смотрит на -Z → его «право» = локальная -X
+            k.gameObject.layer = IgnoreRaycast;
+            var cap = Group(k, "Cap");
+            Box(cap, "Keycap", new Vector3(0, 0.016f, 0), new Vector3(w, 0.032f, 0.082f), null, false).GetComponent<Renderer>().sharedMaterial = mat;
+            var lbl = Text(cap, "Label", label, label.Length > 2 ? 0.16f : 0.3f, textColor, new Vector3(0, 0.024f, 0),
+                Quaternion.LookRotation(Vector3.down, Vector3.back), new Vector2(w - 0.01f, 0.07f));
+            lbl.fontSizeMin = 0.05f;
+            var trig = k.gameObject.AddComponent<BoxCollider>();
+            trig.isTrigger = true; trig.center = new Vector3(0, 0.04f, 0); trig.size = new Vector3(w, 0.06f, 0.085f);
+            var ck = k.gameObject.AddComponent<ComputerKey>();
+            ck.key = label; ck.computer = pc; ck.cap = cap;
+            count++;
+        }
+        const float pitch = 0.1f, x0 = -0.66f;
+        string[] rows = { "1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM" };
+        float[] rowOffset = { 0f, 0.03f, 0.055f, 0.105f };
+        for (int r = 0; r < rows.Length; r++)
+            for (int i = 0; i < rows[r].Length; i++)
+                Key(rows[r][i].ToString(), x0 + rowOffset[r] + i * pitch, -0.2f + r * pitch, 0.082f, r == 0 ? keyDark : keyMat, r == 0 ? Color.white : Color.black);
+        Key("SPACE", x0 + 0.5f, 0.2f, 0.5f, keyMat, Color.black);
+        float xa = 0.55f, xb = 0.72f, xc = 0.635f;
+        Key("OPTION 1", xa, -0.2f, 0.15f, keyYellow, Color.black);
+        Key("OPTION 2", xb, -0.2f, 0.15f, keyYellow, Color.black);
+        Key("OPTION 3", xa, -0.1f, 0.15f, keyYellow, Color.black);
+        Key("DELETE", xb, -0.1f, 0.15f, keyRed, Color.white);
+        Key("UP", xc, 0.0f, 0.15f, keyBlue, Color.white);
+        Key("DOWN", xc, 0.1f, 0.15f, keyBlue, Color.white);
+        Key("ENTER", xc, 0.2f, 0.32f, keyGreen, Color.white);
+
+        // табличка-подсказка на столе
+        Text(root, "Hint", "GRABZ OS — ТЫКАЙ КЛАВИШИ РУКОЙ · UP/DOWN — ВКЛАДКИ", 0.6f, new Color(1f, 0.82f, 0.3f),
+            new Vector3(0, 0.75f, 0.48f), Facing(Vector3.forward), new Vector2(1.7f, 0.08f));
+        Debug.Log($"[MainHub] GRABZ OS computer: {count} keys");
     }
 
     static PushButton MakeButton(Transform panel, string id, Vector3 local, Color color, float d)

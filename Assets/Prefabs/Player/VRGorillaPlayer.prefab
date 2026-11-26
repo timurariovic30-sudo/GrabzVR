@@ -1394,6 +1394,7 @@ GameObject:
   - component: {fileID: 6756942163201958153}
   - component: {fileID: 1981173869325950432}
   - component: {fileID: 8862268623940464153}
+  - component: {fileID: 6332548405789313325}
   m_Layer: 8
   m_Name: VRGorillaPlayer
   m_TagString: Player
@@ -1538,6 +1539,19 @@ MonoBehaviour:
   - {r: 0.6, g: 0.25, b: 0.75, a: 1}
   - {r: 0.95, g: 0.95, b: 0.92, a: 1}
   cycleKey: 95
+--- !u!114 &6332548405789313325
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2204558397689174038}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3483f6d6a2102b7469d0b237467a5611, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GorillaStickTurn
+  deadZone: 0.55
 --- !u!1 &2207719025861001003
 GameObject:
   m_ObjectHideFlags: 0
@@ -1619,7 +1633,7 @@ Canvas:
   m_Enabled: 1
   serializedVersion: 3
   m_RenderMode: 2
-  m_Camera: {fileID: 0}
+  m_Camera: {fileID: 7372924070082611826}
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
@@ -4764,6 +4778,7 @@ MonoBehaviour:
     rotationSource: {fileID: 5460769320171337001}
     side: -1
     palmOffset: 0.12815328
+    rotationOffset: {x: 0, y: 0, z: -90}
     upperBindPos: {x: 0, y: 0, z: 0}
     upperBindRot: {x: 0, y: 0, z: 0, w: 0}
     lowerBindRot: {x: 0, y: 0, z: 0, w: 0}
@@ -4779,6 +4794,7 @@ MonoBehaviour:
     rotationSource: {fileID: 2096543854410263441}
     side: 1
     palmOffset: 0.12815328
+    rotationOffset: {x: 0, y: 0, z: -66}
     upperBindPos: {x: 0, y: 0, z: 0}
     upperBindRot: {x: 0, y: 0, z: 0, w: 0}
     lowerBindRot: {x: 0, y: 0, z: 0, w: 0}
@@ -4788,6 +4804,7 @@ MonoBehaviour:
     lenLower: 0
   maxStretch: 0.35
   elbowHint: {x: 0.6, y: -1, z: -0.5}
+  forearmTwist: 0.6
 --- !u!114 &4423096909617366382
 MonoBehaviour:
   m_ObjectHideFlags: 0

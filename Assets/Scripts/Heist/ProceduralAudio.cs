@@ -4,7 +4,26 @@ using UnityEngine;
 public static class ProceduralAudio
 {
     const int Rate = 44100;
-    static AudioClip coin, siren, beep, engine;
+    static AudioClip coin, siren, beep, engine, keyClick;
+
+    /// Механический «клик» клавиши: резкий щелчок (шум + высокий тон, 8 мс) и глухой «тук» дна (через 25 мс).
+    public static AudioClip KeyClick()
+    {
+        if (keyClick != null) return keyClick;
+        var data = new float[(int)(Rate * 0.07f)];
+        var rnd = new System.Random(7);
+        for (int i = 0; i < data.Length; i++)
+        {
+            float t = i / (float)Rate;
+            float click = t < 0.008f ? ((float)rnd.NextDouble() * 2f - 1f) * 0.5f * (1f - t / 0.008f) + Mathf.Sin(2 * Mathf.PI * 3800f * t) * 0.25f * (1f - t / 0.008f) : 0f;
+            float bt = t - 0.025f;
+            float thock = bt > 0f ? Mathf.Sin(2 * Mathf.PI * 520f * bt) * 0.35f * Mathf.Exp(-bt / 0.008f) + ((float)rnd.NextDouble() * 2f - 1f) * 0.12f * Mathf.Exp(-bt / 0.004f) : 0f;
+            data[i] = click + thock;
+        }
+        keyClick = AudioClip.Create("ProceduralKeyClick", data.Length, 1, Rate, false);
+        keyClick.SetData(data, 0);
+        return keyClick;
+    }
 
     /// Короткий писк тревоги: 0.18 с тона + 0.32 с тишины (клип зациклен → «пи… пи… пи…»).
     public static AudioClip AlarmBeep()
