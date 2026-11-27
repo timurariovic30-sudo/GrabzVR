@@ -105,6 +105,7 @@ public static class BlackBusBuilder
         BuildExteriorFromModel(root, lExt);
         var insideMask = BuildInterior(root, lInt, lPortal);
         portal.insideMask = insideMask;
+        portal.insideOnly = root.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "GlassWalls" || r.name == "CabinGlass").ToArray();
         portal.doorZ = RearZ; portal.interiorEndZ = InteriorEndZ; portal.halfWidth = InHalfW;
         portal.floorY = FloorY; portal.ceilingY = CeilY; portal.doorHalfWidth = DoorHalfW; portal.doorTopY = DoorTopY;
         BuildDepartureRig(root, lExt, lInt, lPortal);

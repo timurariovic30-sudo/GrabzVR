@@ -15,6 +15,9 @@ public class BusPortal : MonoBehaviour
 {
     [Tooltip("Маска салона изнутри (BusPortal-слой, грани смотрят внутрь, с дырой под проём)")]
     public Renderer insideMask;
+    [Tooltip("Смарт-стекло салона и кабины: рисуется только для камеры в салоне. Снаружи автобус глухой, " +
+             "даже если у буфера глубины нет Stencil (иначе стекло видно прозрачной коробкой больше кузова)")]
+    public Renderer[] insideOnly;
     [Header("Салон, локальные оси")]
     public float doorZ = -3.2f;          // плоскость проёма (задняя стенка)
     public float interiorEndZ = 7.7f;    // дальняя стенка салона
@@ -28,6 +31,7 @@ public class BusPortal : MonoBehaviour
     {
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         if (insideMask) insideMask.forceRenderingOff = true;
+        if (insideOnly != null) foreach (var r in insideOnly) if (r) r.forceRenderingOff = true;
     }
 
     void OnDisable()
@@ -38,7 +42,9 @@ public class BusPortal : MonoBehaviour
     void OnBeginCamera(ScriptableRenderContext ctx, Camera cam)
     {
         // forceRenderingOff не сериализуется: в редакторе сцена не помечается изменённой каждый кадр
-        if (insideMask) insideMask.forceRenderingOff = !IsInside(cam);
+        bool inside = IsInside(cam);
+        if (insideMask) insideMask.forceRenderingOff = !inside;
+        if (insideOnly != null) foreach (var r in insideOnly) if (r) r.forceRenderingOff = !inside;
     }
 
     // ------------------------------------------------------------------ гориллы в салоне
