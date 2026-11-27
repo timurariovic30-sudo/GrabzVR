@@ -366,9 +366,9 @@ public static partial class BankVisualOverhaul
         {
             foreach (float x in new[] { -40f, -32f, -18f, 18f, 30f, 40f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -9.4f), x * 7f, 4.6f);
             foreach (float x in new[] { -44f, -36f, -26f, -14f, -2f, 10f, 22f, 33f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -22.6f), x * 5f, 4.2f);
-            foreach (float x in new[] { -15.5f, 15.5f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -3.2f), 0f, 5.2f);
+            foreach (float x in new[] { -15f, 15f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -5.2f), 0f, 4.2f);   // подальше от фасада — кроны не лезут в стену
         }
-        Place(g, "Bank_FireHydrant", new Vector3(-17f, SidewalkY, -9.6f), 0f, 0.8f);
+        Place(g, "Bank_FireHydrant", new Vector3(-21.5f, SidewalkY, -9.6f), 0f, 0.8f);
         Place(g, "Bank_FireHydrant", new Vector3(31f, SidewalkY, -21.9f), 180f, 0.8f);
         Place(g, "Bank_TrashCan", new Vector3(-9f, SidewalkY, -9.6f), 0f, 1.0f);
         Place(g, "Bank_TrashCan", new Vector3(15.5f, SidewalkY, -9.6f), 0f, 1.0f);
@@ -376,10 +376,8 @@ public static partial class BankVisualOverhaul
         Place(g, "Bank_NewsBox", new Vector3(8.8f, SidewalkY, -9.4f), 180f, 1.25f);
         Place(g, "Bank_NewsBox", new Vector3(-28f, SidewalkY, -22f), 0f, 1.25f);
         // у входа в банк: растения в кадках и банкомат на фасаде
-        string entrancePlant = Prefab("Bank_PalmPlanter") ? "Bank_PalmPlanter" : "Bank_PottedPlant";
-        Place(g, entrancePlant, new Vector3(-2.6f, 0f, -1.1f), 0f, 2.6f);
-        Place(g, entrancePlant, new Vector3(2.6f, 0f, -1.1f), 30f, 2.6f);
-        Place(g, "Bank_ATM", new Vector3(17.5f, SidewalkY, -0.95f), 180f, 1.9f);
+        // банкомат на фасаде (из примитивов), спиной к цоколю
+        Atm(g, new Vector3(17.5f, SidewalkY, -0.78f), 0f);
     }
 
     // =========================================================================== фургон грабителей

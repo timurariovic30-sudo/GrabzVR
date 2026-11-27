@@ -22,6 +22,8 @@ public class NetworkVaultDoor : NetworkBehaviour
     [Tooltip("Тексты таблички и сообщения на табло (дверь универсальная: хранилище, служебные входы)")]
     public string openText = "ХРАНИЛИЩЕ ОТКРЫТО";
     public string closedText = "ХРАНИЛИЩЕ ЗАКРЫТО";
+    [Tooltip("Писать об открытии/закрытии на табло (у дверей комнат — нет)")]
+    public bool announce = true;
 
     [Header("Эффекты")]
     public TextMeshPro statusText;
@@ -101,7 +103,7 @@ public class NetworkVaultDoor : NetworkBehaviour
         {
             shownOpen = open;
             Play(open ? openClips : closeClips);
-            if (HeistGameManager.Instance) HeistGameManager.Instance.PostEvent(open ? openText + "!" : closedText);
+            if (announce && HeistGameManager.Instance) HeistGameManager.Instance.PostEvent(open ? openText + "!" : closedText);
         }
         if (Hacking && Time.time >= nextBeep) { nextBeep = Time.time + 0.5f; Play(hackClips); }
 

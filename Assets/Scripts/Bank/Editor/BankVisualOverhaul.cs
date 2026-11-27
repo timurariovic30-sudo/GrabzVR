@@ -32,11 +32,9 @@ public static partial class BankVisualOverhaul
     const string ProfilePath = MatDir + "/BankPostFXProfile.asset";
     const string StatueLootPath = Gen + "/Loot_GoldenStatue.prefab";
     const string DecorRoot = "BankDecor";
-    static readonly string[] TripoNames = { "Bank_VaultDoor", "Bank_GoldenStatue", "Bank_ReceptionDesk", "Bank_GetawayTruck",
-        "Bank_SecurityCamera", "Bank_IronBars", "Bank_ATM", "Bank_TellerCounter", "Bank_OfficeDesk", "Bank_PottedPlant", "Bank_LeatherBench",
-        "Bank_StreetLamp", "Bank_FireHydrant", "Bank_TrashCan", "Bank_NewsBox",
-        "Bank_MiamiTellerDesk", "Bank_OfficeChair", "Bank_CashRegister", "Bank_BreakSofa", "Bank_Kitchenette", "Bank_StaffLockers",
-        "Bank_WaterCooler", "Bank_DirectorDesk", "Bank_SecurityMonitors", "Bank_ServerRack", "Bank_PalmPlanter" };
+    // Tripo только для того, что сложно собрать из примитивов; мебель банка — из примитивов (BankFurniture)
+    static readonly string[] TripoNames = { "Bank_VaultDoor", "Bank_GoldenStatue", "Bank_GetawayTruck",
+        "Bank_StreetLamp", "Bank_FireHydrant", "Bank_TrashCan", "Bank_NewsBox", "Bank_PalmPlanter" };
 
     static readonly StringBuilder log = new StringBuilder();
     static Material marble, marbleDark, limestone, plaster, plasterCool, wallpaper, woodPanel, carpet, armor, armorLight, tread,
@@ -87,6 +85,8 @@ public static partial class BankVisualOverhaul
         foreach (var t in st.GetComponentsInChildren<Transform>(true))
             GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
 
+        AuditTexts(scene);
+        AuditButtons(scene);
         EditorSceneManager.MarkSceneDirty(scene);
         EditorApplication.ExecuteMenuItem("Tools/Fusion/Scene/Bake Scene Objects");
         if (!EditorSceneManager.SaveScene(scene)) log.AppendLine("ERROR: save failed");
@@ -114,16 +114,18 @@ public static partial class BankVisualOverhaul
             ("Bank_00_warmup", new Vector3(6f, 1.2f, -19f), new Vector3(0, 2f, -4f)),   // первый кадр в batchmode без прогретого света
             ("Bank_01_miami_street", new Vector3(-17f, 1.2f, -20.5f), new Vector3(0f, 5f, -1f)),
             ("Bank_02_facade_sign", new Vector3(4f, 0.8f, -15.5f), new Vector3(0f, 10.5f, -2.5f)),
-            ("Bank_03_van", new Vector3(0.8f, 0.7f, -7.6f), new Vector3(0f, -0.1f, -12.8f)),
-            ("Bank_04_hall_tellers", new Vector3(0f, 1.7f, 6f), new Vector3(0f, 1.8f, 22f)),
-            ("Bank_05_teller_workzone", new Vector3(-12.5f, 1.7f, 22.8f), new Vector3(-2f, 1.0f, 18.5f)),
-            ("Bank_06_corridor_stairs", new Vector3(-8.5f, 1.7f, 25.2f), new Vector3(2f, -1f, 26.5f)),
-            ("Bank_07_break_room", new Vector3(-7.0f, 1.7f, 29f), new Vector3(-12f, 0.8f, 36f)),
-            ("Bank_08_director", new Vector3(2.0f, 1.7f, 29.5f), new Vector3(7f, 1.0f, 37f)),
-            ("Bank_09_server_vent", new Vector3(-1.0f, 1.7f, 29f), new Vector3(-4.5f, 0.4f, 38f)),
-            ("Bank_10_basement_stairs", new Vector3(6f, -1.4f, 26.5f), new Vector3(-3f, -1.5f, 26.4f)),
-            ("Bank_11_vault_door", new Vector3(5.5f, -1.3f, 26.5f), new Vector3(0f, -1.8f, 30.6f)),
-            ("Bank_12_basement_vault", new Vector3(8.5f, -1.2f, 31.8f), new Vector3(-4f, -2.2f, 38f)),
+            ("Bank_03_hall_tellers", new Vector3(0f, 1.7f, 9f), new Vector3(0f, 1.6f, 22f)),
+            ("Bank_04_teller_closeup", new Vector3(-7.4f, 1.6f, 14.6f), new Vector3(-9.8f, 1.1f, 17.4f)),
+            ("Bank_05_service_doors", new Vector3(-2.5f, 1.7f, 14.5f), new Vector3(-8.7f, 1.3f, 24f)),
+            ("Bank_06_workzone", new Vector3(-12.6f, 1.7f, 22.6f), new Vector3(-3f, 1.0f, 18.5f)),
+            ("Bank_07_corridor_doors", new Vector3(-13.2f, 1.6f, 25.3f), new Vector3(-3f, 1.1f, 27.9f)),
+            ("Bank_08_break_room", new Vector3(-7.0f, 1.7f, 29f), new Vector3(-12f, 0.8f, 36f)),
+            ("Bank_09_director", new Vector3(2.0f, 1.7f, 29.5f), new Vector3(7f, 1.0f, 36f)),
+            ("Bank_10_server_vent", new Vector3(-5.5f, 1.7f, 29f), new Vector3(0f, 0.8f, 33f)),
+            ("Bank_11_basement_stairs", new Vector3(6f, -1.4f, 26.5f), new Vector3(-3f, -1.5f, 26.4f)),
+            ("Bank_12_vault_door", new Vector3(5.5f, -1.3f, 26.5f), new Vector3(0f, -1.8f, 30.6f)),
+            ("Bank_13_basement_vault", new Vector3(8.5f, -1.2f, 31.8f), new Vector3(-4f, -2.2f, 38f)),
+            ("Bank_14_garage_exit", new Vector3(3.5f, -1.4f, 27.5f), new Vector3(10f, -2f, 26.6f)),
         };
         var go = new GameObject("PreviewCam");
         var cam = go.AddComponent<Camera>();
@@ -188,6 +190,7 @@ public static partial class BankVisualOverhaul
         stripBlue = Emissive("StripBlue", new Color(0.15f, 0.35f, 1f), 4f);
         stripGold = Emissive("StripGold", new Color(1f, 0.7f, 0.25f), 2.5f);
         BuildExteriorMaterials();
+        BuildFurnitureMaterials();
         AssetDatabase.SaveAssets();
     }
 
@@ -404,6 +407,12 @@ public static partial class BankVisualOverhaul
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.fontStyle = FontStyles.Bold;
         tmp.rectTransform.sizeDelta = rect;
+        // без переноса строк и с автоподгонкой: надпись всегда помещается в свою табличку и не наезжает на соседние
+        if (!text.Contains("\n")) tmp.textWrappingMode = TextWrappingModes.NoWrap;
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMax = size;
+        tmp.fontSizeMin = size * 0.2f;
+        tmp.overflowMode = TextOverflowModes.Truncate;
         return tmp;
     }
 
@@ -581,22 +590,14 @@ public static partial class BankVisualOverhaul
         // Старая декоративная дверь из цилиндров внутри хранилища — спрятана: настоящая сетевая дверь стоит во входе (BuildVaultDoor)
         Hide(FindIn(map, "Z5_Vault", "VaultDoorDecor"), "replaced by networked Bank_VaultDoor");
 
-        // Стойка ресепшена: на месте старой, фасадом ко входу (−Z)
-        if (Prefab("Bank_ReceptionDesk"))
-        {
-            Hide(FindIn(map, "Z2_MainHall", "ReceptionDesk"), "replaced by Bank_ReceptionDesk");
-            // модель низкая и широкая (1 : 0.33): ставим по ширине 4.2 м и вытягиваем по высоте, чтобы стекло было выше головы клиента
-            var desk = Place(g, "Bank_ReceptionDesk", new Vector3(8.6f, 0, 3.9f), DeskYaw, 0, 4.2f, stretchY: 1.35f);
-            if (desk) PutGoldBarOnDesk(map, desk);
-        }
+        // справочная стойка у входа (из примитивов), фасадом ко входу (−Z); на ней — слиток
+        Hide(FindIn(map, "Z2_MainHall", "ReceptionDesk"), "replaced by InfoDesk");
+        var desk = InfoDesk(g, new Vector3(8.6f, 0, 3.9f), 0f, 3.2f);
+        PutGoldBarOnDesk(map, desk.gameObject);
 
         // Броневик эвакуации: на месте фургона, кабиной на −X, задние двери на +X (к проезду)
         if (Prefab("Bank_GetawayTruck")) BuildTruck(g, map);
     }
-
-    /// Поворот стойки: мониторы — к кассиру (на север, +Z), фасад — ко входу в Холл.
-    /// После импорта .glb длинная сторона модели лежит вдоль Z, поэтому поворот 90°.
-    const float DeskYaw = 90f;
 
     /// Слиток на стойке ресепшена: опускаем/поднимаем на поверхность новой стойки (луч сверху вниз).
     static void PutGoldBarOnDesk(Transform map, GameObject desk)

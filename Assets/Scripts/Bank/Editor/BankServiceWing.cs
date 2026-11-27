@@ -36,6 +36,7 @@ public static partial class BankVisualOverhaul
         RebuildHallNorthWall(sw, map);
         BuildHallMiami(sw, root, map);
         var doors = BuildServiceDoors(root);
+        BuildRoomDoors(root);
         BuildServiceRooms(sw, root);
         BuildBasement(bm, root, map);
         BuildBasementVaultDoor(root, map);
@@ -81,18 +82,6 @@ public static partial class BankVisualOverhaul
         if (neon) t.fontSharedMaterial = neon;
     }
 
-    /// Ставит Tripo-модель и сжимает её по глубине (локальная Z модели) — для длинных стоек, чтобы не упирались в колонны.
-    static GameObject PlaceSquashed(Transform p, string name, Vector3 floorPos, float yaw, float length, float depthK)
-    {
-        var go = Place(p, name, floorPos, yaw, 0, length);
-        if (!go) return null;
-        var s = go.transform.localScale;
-        go.transform.localScale = new Vector3(s.x, s.y, s.z * depthK);
-        var b = WorldBounds(go);
-        go.transform.position += new Vector3(floorPos.x - b.center.x, floorPos.y - b.min.y, floorPos.z - b.center.z);
-        return go;
-    }
-
     /// Физическая кнопка на стене (как у билдера карты): пластина, корпус, колпачок, триггер, звук, PushButton + подпись.
     static PushButton MakeButton(Transform p, string name, Vector3 pos, Vector3 facing, string label, Color color, UnityAction action)
     {
@@ -132,7 +121,8 @@ public static partial class BankVisualOverhaul
             new GameObject("MovedToBasement").transform.SetParent(z5, false);
             log.AppendLine("  vault contents moved 3 m down into the basement");
         }
-        foreach (Transform t in stv) if (VaultStaticHide.Contains(t.name)) HideQuiet(t);
+        // куски стен билдер называет Wall_E_0, Wall_E_1… — прячем по префиксу
+        foreach (Transform t in stv) if (VaultStaticHide.Any(n => t.name == n || t.name.StartsWith(n + "_"))) HideQuiet(t);
 
         // абсолютные места в подвале (повторный запуск ставит туда же)
         void At(string n, Vector3 p) { var t = dy.Find(n); if (t) { t.position = p; EditorUtility.SetDirty(t); } }
@@ -155,6 +145,8 @@ public static partial class BankVisualOverhaul
             var dir = target - pos;
             cam.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(new Vector3(dir.x, 0, dir.z).normalized));
             if (cam.pivot) cam.pivot.localRotation = Quaternion.LookRotation(Quaternion.Inverse(cam.transform.rotation) * dir.normalized);
+            // конус обзора рисуется сквозь стены — у камеры в подвале он просвечивал бы через пол в кабинет директора
+            if (cam.cone) { cam.cone.enabled = false; EditorUtility.SetDirty(cam.cone); }
             EditorUtility.SetDirty(cam.transform);
         }
         var tp = z5.Find("TeleportPoint_Vault");
@@ -196,9 +188,31 @@ public static partial class BankVisualOverhaul
     // =========================================================================== северная стена Холла и Холл в стиле Майами
     static void RebuildHallNorthWall(Transform p, Transform map)
     {
-        foreach (var w in Named(map, "Z2_MainHall", "Wall_N")) HideQuiet(w);
+        // старая стена: куски Wall_N_0, Wall_N_1… (по точному имени их не найти — иначе она закрывает служебные двери)
+        foreach (var w in map.Find("Z2_MainHall").Find("Static").Cast<Transform>().Where(t => t.name == "Wall_N" || t.name.StartsWith("Wall_N_")).ToArray()) HideQuiet(w);
+        FixOldTexts(map);
+        // старые надписи билдера у заделанного проёма хранилища (решётка, «ХРАНИЛИЩЕ») — убираем
+        foreach (var t in map.Find("Z2_MainHall").GetComponentsInChildren<TMPro.TextMeshPro>(true))
+            if (t.transform.position.z > 23.4f && t.transform.position.y < 5f && Mathf.Abs(t.transform.position.x) < 3f && !t.GetComponentInParent<PushButton>() && !t.transform.parent.name.StartsWith("GatePlate"))
+                HideQuiet(t.transform);
         // стена от подвала до потолка: две служебные двери, центральный проём старого хранилища заделан
         WallC(p, "HallWall_N", false, 24f, -14f, 14f, BasementY, 10f, 0.3f, stuccoWhite, (-9.6f, -7.8f, 0f, 2.6f), (5.0f, 6.8f, 0f, 2.6f));
+    }
+
+    /// Надписи старого билдера, которые не подходят новому банку: старое название, «пульт», «фургон», табличка заделанного хранилища.
+    static void FixOldTexts(Transform map)
+    {
+        var sv = map.Find("Z2_MainHall/Static/Sign_Vault");
+        if (sv) HideQuiet(sv);
+        foreach (var t in map.root.GetComponentsInChildren<TMPro.TextMeshPro>(true))
+        {
+            string s = t.text, n = s;
+            if (s.Contains("ЗОЛОТОЙ БАНАН")) { n = "SUNSET TRUST BANK"; t.fontSharedMaterial = neonPink; t.color = Color.white; }
+            else if (s.Contains("ГАРАЖ · ФУРГОН")) n = s.Replace("ФУРГОН", "ЭВАКУАЦИЯ");
+            else if (s.Contains("ВЕНТИЛЯЦИЯ → ?")) n = "ВЕНТИЛЯЦИЯ →";
+            else if (s.Contains("НА ПУЛЬТЕ")) n = s.Replace("ЖМИ «СТАРТ» НА ПУЛЬТЕ", "ВЫЙДИ ИЗ ФУРГОНА — СТАРТ!");
+            if (n != s) { t.text = n; EditorUtility.SetDirty(t); }
+        }
     }
 
     static void BuildHallMiami(Transform p, Transform root, Transform map)
@@ -256,49 +270,32 @@ public static partial class BankVisualOverhaul
             l.spotAngle = 65f; l.innerSpotAngle = 35f; l.shadows = LightShadows.None;
         }
 
-        // длинные кассовые стойки с логотипом на фасаде (окошками к клиентам, −Z)
+        // длинные кассовые стойки (собраны из примитивов) с логотипом на фасаде, окошками к клиентам (−Z)
         var tellers = Group(p, "TellerDesks");
-        foreach (float x in new[] { -9.8f, -5.2f, 5.2f, 9.8f })
-        {
-            var d = PlaceSquashed(tellers, "Bank_MiamiTellerDesk", new Vector3(x, 0, 17.2f), 180f, 4.4f, 0.6f);
-            if (!d) continue;
-            var b = WorldBounds(d);
-            var t = Label(tellers, "DeskLogo", "SUNSET TRUST BANK", 2.4f, Color.white, new Vector3(x, 0.5f, b.min.z - 0.03f), Vector3.back, new Vector2(4.0f, 0.35f));
-            t.fontSharedMaterial = neonPink;
-        }
-        // рабочая зона кассиров: задние стойки, кассовые аппараты, мониторы, кресла и точки появления NPC
+        foreach (float x in new[] { -9.8f, -5.2f, 5.2f, 9.8f }) TellerDesk(tellers, new Vector3(x, 0, 17.2f), 0f, 4.4f);
+        // рабочая зона кассиров: задние стойки, кресла и точки появления NPC
         var work = Group(p, "TellerWorkZone");
         foreach (var (x0, x1) in new[] { (-12.8f, -10.2f), (-7.2f, -1.0f), (1.0f, 4.6f), (7.4f, 12.8f) })
         {
             Box(work, "BackCounter", new Vector3((x0 + x1) / 2, 0.45f, 20.5f), new Vector3(x1 - x0, 0.9f, 0.6f), woodPanel, true);
             Box(work, "BackCounterTop", new Vector3((x0 + x1) / 2, 0.925f, 20.5f), new Vector3(x1 - x0 + 0.06f, 0.05f, 0.66f), marbleGold, true);
-        }
-        foreach (float x in new[] { -11.5f, -4.0f, 2.8f, 10.1f })
-        {
-            Place(work, "Bank_CashRegister", new Vector3(x, 0.95f, 20.45f), 180f, 0.38f);
-            Box(work, "Monitor", new Vector3(x + 0.85f, 1.15f, 20.55f), new Vector3(0.45f, 0.38f, 0.35f), stuccoPeach);
-            Box(work, "MonitorScreen", new Vector3(x + 0.85f, 1.17f, 20.37f), new Vector3(0.36f, 0.28f, 0.02f), neonCyanMesh);
+            for (float x = x0 + 0.5f; x < x1 - 0.3f; x += 1.3f)
+                Box(work, "PaperStack", new Vector3(x, 0.99f, 20.5f), new Vector3(0.3f, 0.08f, 0.22f), paper);
         }
         var spawns = Group(root, "CashierSpawnPoints");
         int i = 1;
         foreach (float x in new[] { -10.2f, -3.9f, 3.9f, 10.2f })
         {
-            Place(work, "Bank_OfficeChair", new Vector3(x, 0, 18.9f), 180f, 1.05f);
+            OfficeChair(work, new Vector3(x, 0, 18.9f), 0f);                     // кресло лицом к окошку
             var sp = new GameObject($"CashierSpawnPoint_{i++}").transform;          // пустой маркер под будущую NPC-кассиршу
             sp.SetParent(spawns, false);
             sp.SetPositionAndRotation(new Vector3(x, 0, 18.9f), Quaternion.Euler(0, 180, 0));
         }
 
-        // логотип на стене за кассами и большой — над балконом
+        // логотип на стене за кассами (между служебными дверями)
         Logo(p, new Vector3(-1.4f, 3.45f, 23.8f), 0.55f);
-        var wt = Label(p, "WallLogo", "SUNSET TRUST BANK", 3.2f, Color.white, new Vector3(-1.4f, 2.35f, 23.82f), Vector3.back, new Vector2(8f, 0.5f));
+        var wt = Label(p, "WallLogo", "SUNSET TRUST BANK", 3.2f, Color.white, new Vector3(-1.4f, 2.35f, 23.82f), Vector3.back, new Vector2(6.0f, 0.45f));
         wt.fontSharedMaterial = neonPink;
-        Logo(p, new Vector3(-6.2f, 6.6f, 23.8f), 0.75f);
-        var bt = Label(p, "WallLogoBig", "SUNSET TRUST BANK", 4.6f, Color.white, new Vector3(1.2f, 6.55f, 23.82f), Vector3.back, new Vector2(11f, 0.7f));
-        bt.fontSharedMaterial = neonCyan;
-        // таблички над служебными дверями
-        foreach (float x in new[] { -8.7f, 5.9f })
-            Sign(p, "StaffOnly", "ТОЛЬКО ДЛЯ ПЕРСОНАЛА", new Vector3(x, 2.85f, 23.82f), Vector3.back, 1.2f, 1.7f);
     }
 
     // =========================================================================== служебные двери (сеть)
@@ -376,19 +373,17 @@ public static partial class BankVisualOverhaul
         PL("ServerRoomLight", new Vector3(-2.5f, ServiceCeil - 0.3f, 34f), new Color(0.5f, 0.9f, 1f), 1.6f, 8f);
         PL("DirectorLight", new Vector3(5.5f, ServiceCeil - 0.3f, 34f), new Color(1f, 0.82f, 0.6f), 1.9f, 9f);
 
-        // комната отдыха
+        // комната отдыха (мебель из примитивов)
         var br = Group(g, "BreakRoom");
-        Place(br, "Bank_BreakSofa", new Vector3(-13.3f, 0, 34f), 90f, 0, 2.4f);
-        Place(br, "Bank_Kitchenette", new Vector3(-10f, 0, 39.3f), 180f, 1.5f);
-        Place(br, "Bank_StaffLockers", new Vector3(-6.5f, 0, 32.5f), -90f, 0, 2.6f);
-        Place(br, "Bank_WaterCooler", new Vector3(-13.3f, 0, 29.0f), 90f, 1.4f);
-        Cyl(br, "Table_Leg", new Vector3(-10f, 0.37f, 33.5f), 0.08f, 0.74f, chromeMat, true);
-        Cyl(br, "Table_Top", new Vector3(-10f, 0.76f, 33.5f), 0.6f, 0.04f, marbleGold, true);
-        Sign(br, "Sign_Break_Poster", "ПЕРЕРЫВ — 15 МИНУТ!", new Vector3(-13.82f, 1.8f, 36.5f), Vector3.right, 1.0f, 1.4f);
+        Sofa(br, new Vector3(-13.42f, 0, 34f), -90f, 2.2f);                        // спинкой к западной стене
+        Kitchenette(br, new Vector3(-10f, 0, 39.52f), 0f, 2.2f);                   // у северной стены
+        Lockers(br, new Vector3(-6.35f, 0, 33f), 90f, 4);                          // у перегородки с серверной
+        WaterCooler(br, new Vector3(-13.6f, 0, 29.3f), -90f);
+        RoundTable(br, new Vector3(-10f, 0, 33.5f));
 
         // серверная + люк вентиляции в подвал
         var sv = Group(g, "ServerRoom");
-        foreach (float zz in new[] { 30.5f, 32.5f, 35.5f, 37.5f }) Place(sv, "Bank_ServerRack", new Vector3(0.42f, 0, zz), -90f, 2.2f);
+        foreach (float zz in new[] { 29.9f, 30.55f, 31.2f, 36.1f, 36.75f, 37.4f }) ServerRack(sv, new Vector3(0.5f, 0, zz), 90f);
         foreach (var (pos, size) in new[]
         {
             (new Vector3(-4.6f, 0.45f, 37.57f), new Vector3(1.26f, 0.9f, 0.06f)), (new Vector3(-4.6f, 0.45f, 38.83f), new Vector3(1.26f, 0.9f, 0.06f)),
@@ -400,9 +395,9 @@ public static partial class BankVisualOverhaul
 
         // кабинет директора: стол, кресло, пульт видеонаблюдения, сейф за картиной
         var dr = Group(g, "DirectorOffice");
-        Place(dr, "Bank_DirectorDesk", new Vector3(5.5f, 0, 35.3f), 180f, 0, 2.6f);
-        Place(dr, "Bank_OfficeChair", new Vector3(5.5f, 0, 36.9f), 180f, 1.1f);
-        Place(dr, "Bank_SecurityMonitors", new Vector3(9.0f, 0, 31.6f), -90f, 0, 2.0f);
+        DirectorDesk(dr, new Vector3(5.5f, 0, 35.3f), 0f);                         // лицом к двери (−Z)
+        OfficeChair(dr, new Vector3(5.5f, 0, 36.3f), 0f);
+        SecurityConsole(dr, new Vector3(9.49f, 0, 31.8f), 90f);                    // у восточной стены
         Box(dr, "WallSafe", new Vector3(5.5f, 1.55f, 39.65f), new Vector3(0.8f, 0.8f, 0.4f), armor, true);
         Box(dr, "WallSafeInside", new Vector3(5.5f, 1.55f, 39.44f), new Vector3(0.62f, 0.62f, 0.02f), windowDark);
         Box(dr, "WallSafeShelf", new Vector3(5.5f, 1.2f, 39.5f), new Vector3(0.62f, 0.04f, 0.3f), armor, true);
@@ -430,7 +425,6 @@ public static partial class BankVisualOverhaul
         // стена хранилища с круглым проёмом под бронедверь
         WallC(p, "VaultWall", false, 31.0f, -14f, 10f, yb, ceil, 0.4f, armor, (-1.45f, 1.45f, yb, -0.55f));
         Sign(p, "Sign_Garage", "→ ГАРАЖ · ЭВАКУАЦИЯ", new Vector3(7.5f, -1.2f, 30.78f), Vector3.back, 1.2f, 2.4f, neonCyan);
-        Sign(p, "Sign_Vault", "ХРАНИЛИЩЕ", new Vector3(-5f, -0.6f, 30.78f), Vector3.back, 1.4f, 1.6f, neonPink);
 
         // лестница: 15 ступеней по 0.2 м вдоль +X (от x = −3.5 у коридора до x = 2.5 в подвале) и пандус рядом
         for (int k = 0; k < 15; k++)
@@ -456,7 +450,7 @@ public static partial class BankVisualOverhaul
         Box(p, "Rail_E", new Vector3(2.56f, 1.0f, 25.9f), new Vector3(0.06f, 0.06f, 3.5f), brass, true);
 
         // в хранилище: решётка перед ячейками, люк вентиляции в потолке, освещение полосами (BuildAccentStrips)
-        Place(p, "Bank_IronBars", new Vector3(-6.7f, yb, 39.2f), BarsYaw(alongX: true), 0, 6.6f, targetHeight: 2.4f);
+        IronBarsPanel(p, new Vector3(-6.7f, yb, 39.2f), 0f, 6.6f, 2.4f);
         Box(p, "VentHatch_Basement", new Vector3(-4.6f, ceil - 0.02f, 38.2f), new Vector3(1.4f, 0.03f, 1.4f), paint);
     }
 
@@ -566,11 +560,11 @@ public static partial class BankVisualOverhaul
         }
         Spawn(keycard, new Vector3(-10f, 0.79f, 33.5f), 25f);                     // на столике в комнате отдыха
         var c1 = Spawn(cash, new Vector3(-10f, 1.0f, 39.0f), 0f);                  // на кухне
-        var kitchen = sw.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name.StartsWith("Bank_Kitchenette"));
+        var kitchen = sw.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Kitchenette");
         if (kitchen) PutOnTop(c1.transform, kitchen.gameObject, 0.5f, 1.2f);
         Spawn(cash, new Vector3(5.5f, 1.23f, 39.5f), 0f);                          // в сейфе за картиной
         var c3 = Spawn(cash, new Vector3(5.5f, 0.9f, 35.3f), 30f);                 // на столе директора
-        var desk = sw.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name.StartsWith("Bank_DirectorDesk"));
+        var desk = sw.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DirectorDesk");
         if (desk) PutOnTop(c3.transform, desk.gameObject, 0.5f, 1.2f);
 
         var reg = Object.FindAnyObjectByType<LootRegistry>(FindObjectsInactive.Include);
