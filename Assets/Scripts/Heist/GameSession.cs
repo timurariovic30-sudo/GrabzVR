@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// Данные, которые переживают переход Хаб → Уровень: выбранный режим игры и примеренная косметика.
@@ -57,7 +57,7 @@ public static class GameSession
 
     public static CosmeticSlot SlotOf(string id) => id switch
     {
-        "RobberMask" or "RobberMaskWhite" => CosmeticSlot.FaceMask,   // чёрная и белая балаклава
+        "RobberMask" or "RobberMaskWhite" or "RobberMaskGray" => CosmeticSlot.FaceMask,   // чёрная, белая и серая балаклава
         "GoldChain" => CosmeticSlot.Neck,
         _ => CosmeticSlot.Headwear,       // Crown и будущие шапки
     };

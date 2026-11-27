@@ -28,9 +28,10 @@ public class BusDeparture : MonoBehaviour
     public Renderer[] beams;           // объёмные лучи (аддитивные конусы)
     public Renderer[] ledStrips;       // узкие LED-полосы фар
     public float headlightIntensity = 9f;
+    public float headlightIdle = 3f;               // фары горят и на стоянке
     [Header("Движение")]
     public float driveDistance = 48f;
-    public float driveTime = 4.2f;
+    public float driveTime = 5f;                  // поездка по тоннелю — ровно 5 секунд
     public float idleShake = 0.006f;
     [Header("Кабина водителя")]
     public Renderer[] dashGlow;        // контур панели, «контур пути», ступица руля
@@ -115,9 +116,9 @@ public class BusDeparture : MonoBehaviour
     void SetLights(float k)
     {
         lightLevel = k;
-        if (headlights != null) foreach (var l in headlights) if (l) { l.enabled = k > 0.01f; l.intensity = headlightIntensity * k; }
+        if (headlights != null) foreach (var l in headlights) if (l) { l.enabled = true; l.intensity = Mathf.Lerp(headlightIdle, headlightIntensity, k); }
         if (beams != null) foreach (var b in beams) if (b) b.enabled = k > 0.01f;
-        if (ledStrips != null) foreach (var s in ledStrips) if (s) s.enabled = k > 0.01f;
+        if (ledStrips != null) foreach (var s in ledStrips) if (s) s.enabled = true;
     }
 
     /// Тусклая сапфировая приборка: в покое едва светится, при запуске двигателя оживает,

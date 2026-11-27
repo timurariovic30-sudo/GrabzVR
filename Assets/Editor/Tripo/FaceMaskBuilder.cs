@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEditor;
@@ -36,6 +36,7 @@ public static class FaceMaskBuilder
     {
         ("RobberMask", new Color32(0x16, 0x16, 0x1A, 0xFF), new Color32(0x3A, 0x3A, 0x42, 0xFF), "Black"),
         ("RobberMaskWhite", new Color32(0xEA, 0xEA, 0xEF, 0xFF), new Color32(0xC4, 0xC4, 0xCC, 0xFF), "White"),
+        ("RobberMaskGray", new Color32(0x6E, 0x71, 0x78, 0xFF), new Color32(0x50, 0x53, 0x5A, 0xFF), "Gray"),
     };
 
     // ---- разметка лица в осях корня префаба VRGorillaPlayer (снята с фронтального снимка головы)
@@ -95,7 +96,7 @@ public static class FaceMaskBuilder
         finally { PrefabUtility.UnloadPrefabContents(net); }
 
         // 3) ПК-гориллы в сценах + образец на витрине хаба
-        foreach (var path in new[] { HubPath, HeistPath })
+        foreach (var path in new[] { HubPath })   // ветка hub: сцену ограбления (HeistLevel_Test) не трогаем
         {
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             foreach (var rig in Object.FindObjectsByType<GorillaFinalRig>(FindObjectsInactive.Include))
@@ -393,6 +394,9 @@ public static class FaceMaskBuilder
             rims++;
         }
 
+        // ---- эластичная лента вокруг затылка: от левого края маски к правому, плотно по голове (над ушами)
+        Strap(tris, outline, verts, uvs, tri);
+
         var face = new Mesh { name = "Cos_FaceMask_Face", indexFormat = IndexFormat.UInt32 };
         face.SetVertices(verts); face.SetUVs(0, uvs);
         face.subMeshCount = 2;                                           // 0 — вязаная ткань, 1 — прошитая окантовка
@@ -411,6 +415,68 @@ public static class FaceMaskBuilder
         face.SetVertices(verts.Select(v => v - center).ToList());
         face.RecalculateBounds();
         faceSpace = face;
+    }
+
+    /// Ровная плоская резинка (ширина 2.4 см, толщина 4 мм) по окружности головы сзади: концы — на краях
+    /// маски у висков, сзади чуть выше (над ушами), лежит на 6 мм над поверхностью, без провалов в череп.
+    static void Strap(List<Tri> tris, List<Vector2> outline, List<Vector3> verts, List<Vector2> uvs, List<int> tri)
+    {
+        var hb = new Bounds(tris[0].a, Vector3.zero);
+        foreach (var t in tris) { hb.Encapsulate(t.a); hb.Encapsulate(t.b); hb.Encapsulate(t.c); }
+        // центр головы по XZ — середина черепа (по кромке ушей), высоты ленты
+        var hc = new Vector3(Cx, 0, hb.center.z);
+        const float ySide = 1.535f, yBack = 1.565f, lift = 0.006f, halfW = 0.012f, thick = 0.004f;
+        // концы ленты — на контуре маски на высоте ySide
+        Vector3 End(float side)
+        {
+            var p = outline.Where(q => Mathf.Sign(q.x - Cx) == side).OrderBy(q => Mathf.Abs(q.y - ySide)).First();
+            return Raycast(tris, new Vector3(p.x, p.y, 0.6f), Vector3.back, out var hit, out var n) ? hit + n * (Lift + 0.002f) : new Vector3(p.x, p.y, 0);
+        }
+        Vector3 eL = End(-1), eR = End(1);
+        float aL = Mathf.Atan2(eL.x - hc.x, eL.z - hc.z), aR = Mathf.Atan2(eR.x - hc.x, eR.z - hc.z);
+        float sweep = 2f * Mathf.PI - (aR - aL);                       // через затылок
+        var pts = new List<Vector3>(); var nrm = new List<Vector3>();
+        const int N = 56;
+        for (int i = 0; i <= N; i++)
+        {
+            float t = i / (float)N, a = aL - sweep * t;
+            float y = Mathf.Lerp(ySide, yBack, Mathf.Sin(t * Mathf.PI));
+            var dir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+            var o = new Vector3(hc.x, y, hc.z) + dir * 0.6f;
+            if (!Raycast(tris, o, -dir, out var hit, out var n)) continue;
+            n = Vector3.ProjectOnPlane(n, Vector3.up).normalized; if (n.sqrMagnitude < 0.5f) n = dir;
+            pts.Add(hit + n * lift); nrm.Add(n);
+        }
+        if (pts.Count < 8) { log.AppendLine("  WARN: strap skipped"); return; }
+        pts[0] = eL; pts[pts.Count - 1] = eR;
+        // сглаживание (лента натянута, без «ступенек» низкополигональной головы) и не глубже кожи
+        for (int it = 0; it < 4; it++)
+            for (int i = 1; i < pts.Count - 1; i++)
+            {
+                var s = (pts[i - 1] + pts[i] * 2f + pts[i + 1]) / 4f;
+                float r0 = new Vector2(pts[i].x - hc.x, pts[i].z - hc.z).magnitude, r1 = new Vector2(s.x - hc.x, s.z - hc.z).magnitude;
+                if (r1 < r0) s = new Vector3(hc.x, s.y, hc.z) + new Vector3(s.x - hc.x, 0, s.z - hc.z).normalized * r0;   // не внутрь
+                pts[i] = s;
+            }
+        // плоская лента-коробочка: внешняя/внутренняя грани + верхний/нижний торцы
+        int b0 = verts.Count; float along = 0;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            if (i > 0) along += (pts[i] - pts[i - 1]).magnitude;
+            var tan = (pts[Mathf.Min(i + 1, pts.Count - 1)] - pts[Mathf.Max(i - 1, 0)]).normalized;
+            var outN = Vector3.ProjectOnPlane(nrm[i], tan).normalized;
+            var up = Vector3.Cross(outN, tan).normalized; if (up.y < 0) up = -up;
+            foreach (var (o, w) in new[] { (thick, halfW), (thick, -halfW), (0f, -halfW), (0f, halfW) })
+            { verts.Add(pts[i] + outN * o + up * w); uvs.Add(new Vector2(along * 25f, w > 0 ? 1 : 0)); }
+        }
+        for (int i = 0; i < pts.Count - 1; i++)
+            for (int k = 0; k < 4; k++)
+            {
+                int k1 = (k + 1) % 4;
+                int a = b0 + i * 4 + k, b = b0 + (i + 1) * 4 + k, c = b0 + (i + 1) * 4 + k1, d = b0 + i * 4 + k1;
+                tri.AddRange(new[] { a, b, c, a, c, d });
+            }
+        log.AppendLine($"  strap: {pts.Count} points, length {along * 100f:F0} cm, ends at mask edges L {eL:F3} R {eR:F3}");
     }
 
     static List<Vector2> Resample(List<Vector2> loop, float step)
@@ -528,7 +594,7 @@ public static class FaceMaskBuilder
     /// Образцы на витрине косметики в хабе: Sample_1 — чёрная, Sample_3 — белая балаклава (уменьшенные).
     static void ShowcaseSample(Mesh face, Material[][] mats)
     {
-        foreach (var (sampleName, vi) in new[] { ("Sample_1", 0), ("Sample_3", 1) })
+        foreach (var (sampleName, vi) in new[] { ("Sample_1", 0), ("Sample_3", 1), ("Sample_4", 2) })
         {
             var sample = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include).FirstOrDefault(t => t.name == sampleName && t.parent && t.parent.name == "CosmeticShowcase");
             if (!sample) { log.AppendLine($"  showcase {sampleName} not found — skipped"); continue; }

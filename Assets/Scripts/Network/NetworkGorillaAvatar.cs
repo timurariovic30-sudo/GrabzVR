@@ -1,4 +1,4 @@
-using Fusion;
+﻿using Fusion;
 using TMPro;
 using UnityEngine;
 
@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public class NetworkGorillaAvatar : NetworkBehaviour
 {
-    static readonly string[] CosmeticIds = { "", "Crown", "RobberMask", "GoldChain", "RobberMaskWhite" };
+    static readonly string[] CosmeticIds = { "", "Crown", "RobberMask", "GoldChain", "RobberMaskWhite", "RobberMaskGray" };
 
     [Networked] public Vector3 HeadPos { get; set; }
     [Networked] public Quaternion HeadRot { get; set; }

@@ -5,7 +5,8 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Вход на миссию через чёрный автобус в хабе (BlackBusBuilder): игрок проходит через задний проём
-/// в салон → 3-секундный отсчёт со звуком зажигания → плавное затемнение → загрузка уровня.
+/// в салон → 10-секундный отсчёт со звуком зажигания → 5 с поездки по тоннелю (последние 1.5 с — затемнение)
+/// → бесшовная загрузка уровня.
 /// Вышел из салона — отсчёт отменяется.
 /// Зона салона — BoxCollider-триггер на этом объекте (проверяется по позиции игрока, без физики).
 /// Скин (PlayerPrefs), режим и косметика (GameSession) переходят на уровень автоматически.
@@ -13,12 +14,12 @@ using UnityEngine.SceneManagement;
 public class VanPortal : MonoBehaviour
 {
     public string sceneName = GameSession.HeistScene;
-    public float countdown = 3f;
+    public float countdown = 10f;                 // ожидание экипажа перед стартом
     public PlayerModeSwitcher switcher;
     public TextMeshPro countdownText;
     public AudioSource engineSource;
     public Material fadeMaterial;
-    public float fadeTime = 0.8f;
+    public float fadeTime = 1.5f;                 // затемнение — последние 1.5 с поездки
     [Tooltip("Анимация отправки автобуса в тоннель (дверь, фары, дрожь, выезд)")]
     public BusDeparture bus;
 
@@ -63,14 +64,22 @@ public class VanPortal : MonoBehaviour
         }
         if (countdownText) countdownText.text = "НА ДЕЛО!";
         GameSession.ArrivedFromHub = true;
+        // без сети — уровень грузится заранее в фоне (LoadSceneAsync) и включается в конце поездки: переход без зависания
+        AsyncOperation preload = null;
+        if (FusionNetworkManager.Instance == null || FusionNetworkManager.Instance.Runner == null || !FusionNetworkManager.Instance.Runner.IsRunning)
+        {
+            preload = SceneManager.LoadSceneAsync(sceneName);
+            if (preload != null) preload.allowSceneActivation = false;
+        }
         if (bus)
         {
-            // автобус трогается в тоннель; экран гаснет к концу разгона
+            // автобус едет по тоннелю ровно driveTime (5 с); в последние fadeTime (1.5 с) экран плавно гаснет
             StartCoroutine(bus.DriveOff());
-            yield return new WaitForSeconds(Mathf.Max(0f, bus.driveTime - fadeTime - 0.6f));
+            yield return new WaitForSeconds(Mathf.Max(0f, bus.driveTime - fadeTime));
         }
         yield return ScreenFader.FadeOut(fadeMaterial, fadeTime);
+        if (preload != null) { preload.allowSceneActivation = true; yield break; }
         // в сети — едут все игроки сессии (общая смена сцены Fusion), без сети — как раньше
-        if (!FusionNetworkManager.LoadSceneSynced(sceneName)) SceneManager.LoadScene(sceneName);
+        if (!FusionNetworkManager.LoadSceneSynced(sceneName)) SceneManager.LoadSceneAsync(sceneName);
     }
 }

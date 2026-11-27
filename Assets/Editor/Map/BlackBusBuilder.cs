@@ -794,17 +794,41 @@ public static class BlackBusBuilder
         go.GetComponent<MeshRenderer>().sharedMaterials = new[] { mBody, mGlass };
 
         // ---- узкие LED-фары и задние фонари (поверх модели)
-        float FrontAt(float y, float x) => v.Where(p => Mathf.Abs(p.y - y) < 0.1f && Mathf.Abs(Mathf.Abs(p.x) - x) < 0.18f).Select(p => p.z).DefaultIfEmpty(FrontZ).Max();
-        float RearAt(float y, float x) => v.Where(p => Mathf.Abs(p.y - y) < 0.12f && Mathf.Abs(Mathf.Abs(p.x) - x) < 0.1f).Select(p => p.z).DefaultIfEmpty(RearZ).Min();
+        // точное попадание в поверхность кузова: луч по оси Z вдоль модели (фары — спереди, фонари — сзади)
+        var bodyTris = body.Concat(glass).ToList();
+        float SurfaceZ(float x, float y, bool front)
+        {
+            var o = new Vector3(x, y, front ? FrontZ + 2f : RearZ - 2f); var d = front ? Vector3.back : Vector3.forward;
+            float best = float.MaxValue;
+            for (int i = 0; i < bodyTris.Count; i += 3)
+            {
+                Vector3 a = v[bodyTris[i]], e1 = v[bodyTris[i + 1]] - a, e2 = v[bodyTris[i + 2]] - a, pv = Vector3.Cross(d, e2);
+                float det = Vector3.Dot(e1, pv); if (Mathf.Abs(det) < 1e-9f) continue;
+                Vector3 tv = o - a; float u = Vector3.Dot(tv, pv) / det; if (u < 0 || u > 1) continue;
+                Vector3 qv = Vector3.Cross(tv, e1); float w = Vector3.Dot(d, qv) / det; if (w < 0 || u + w > 1) continue;
+                float t = Vector3.Dot(e2, qv) / det; if (t > 0 && t < best) best = t;
+            }
+            return best < float.MaxValue ? o.z + d.z * best : float.NaN;
+        }
         float hy = 0.34f * H;
         var leds = new List<Renderer>();
         foreach (float sx in new[] { -1f, 1f })
         {
-            float x = W / 2f - 0.42f;
-            var led = Prim(PrimitiveType.Cube, ext, "LED_Headlight", new Vector3(sx * x, hy, FrontAt(hy, x) + 0.004f), new Vector3(0.42f, 0.03f, 0.03f), Quaternion.Euler(0, -sx * 12f, sx * 7f), mLed, lExt, false);
+            // передний LED-модуль фары на бампере: корпус + яркая белая полоса, вплотную к поверхности
+            float x = W / 2f - 0.45f, zf = SurfaceZ(sx * x, hy, true);
+            if (float.IsNaN(zf)) zf = FrontZ;
+            var module = new GameObject(sx < 0 ? "HeadlightModule_L" : "HeadlightModule_R").transform;
+            module.SetParent(root, false);                                    // прямо в корне автобуса
+            module.localPosition = new Vector3(sx * x, hy, zf);
+            Prim(PrimitiveType.Cube, module, "Housing", new Vector3(0, 0, 0.012f), new Vector3(0.40f, 0.075f, 0.03f), Quaternion.identity, mStep, lExt, false);
+            var led = Prim(PrimitiveType.Cube, module, "LED_Headlight", new Vector3(0, 0, 0.03f), new Vector3(0.36f, 0.035f, 0.012f), Quaternion.identity, mLed, lExt, false);
             leds.Add(led.GetComponent<Renderer>());
-            float tx = W / 2f - 0.07f, ty = 0.47f * H;
-            Prim(PrimitiveType.Cube, ext, "LED_Tail", new Vector3(sx * tx, ty, RearAt(ty, tx) - 0.01f), new Vector3(0.04f, 0.42f, 0.03f), Quaternion.identity, mTail, lExt, false);
+            // задний красный габарит: вертикальная полоса поверхность-в-поверхность к задней стенке
+            float tx = W / 2f - 0.1f, ty = 0.47f * H, zr = float.NaN;
+            for (int k = 0; k < 8 && float.IsNaN(zr); k++, tx -= 0.03f) zr = SurfaceZ(sx * tx, ty, false);
+            if (float.IsNaN(zr)) zr = DoorZ;
+            Prim(PrimitiveType.Cube, root, sx < 0 ? "LED_Tail_L" : "LED_Tail_R", new Vector3(sx * tx, ty, zr - 0.006f), new Vector3(0.045f, 0.42f, 0.012f), Quaternion.identity, mTail, lExt, false);
+            log.AppendLine($"  {(sx < 0 ? "L" : "R")}: headlight on bumper z {zf:F3}, tail on rear wall z {zr:F3} (x {sx * tx:F2})");
         }
         headlightLeds = leds.ToArray();
 
@@ -930,19 +954,17 @@ public static class BlackBusBuilder
         foreach (var led in headlightLeds)
         {
             var p = led.transform.localPosition;
-            var lgo = new GameObject("Headlight");
-            lgo.transform.SetParent(ext, false);
-            // источник света — сразу за лобовым стеклом кабины (нос кузова находится внутри длинного салона:
-            // фара там давала бы блики на стекле кабины); объёмный луч остаётся у фары кузова (виден только снаружи)
-            lgo.transform.localPosition = new Vector3(p.x, hy, InteriorEndZ + 0.25f);
+            var lgo = new GameObject("HeadlightSpot");
+            lgo.transform.SetParent(led.transform.parent, false);              // в модуле фары на бампере (в корне автобуса)
+            lgo.transform.localPosition = new Vector3(0, 0, 0.06f);
             lgo.transform.localRotation = Quaternion.Euler(4f, 0, 0);
             var l = lgo.AddComponent<Light>();
             l.type = LightType.Spot; l.color = new Color(0.82f, 0.9f, 1f); l.range = 34f; l.spotAngle = 52f; l.innerSpotAngle = 20f;
-            l.shadows = LightShadows.None; l.intensity = 0f; l.enabled = false;
+            l.shadows = LightShadows.None; l.intensity = 3f; l.enabled = true;   // фары горят всегда, при запуске — на полную
             l.cullingMask = ~(1 << lInt);   // светят в тоннель, но не в салон/кабину (нос кузова — внутри длинного салона)
             lights.Add(l);
-            var beam = Part(ext, "LightBeam", beamMesh, beamMat, lExt, false);
-            beam.transform.localPosition = new Vector3(p.x, hy, p.z + 0.05f);
+            var beam = Part(led.transform.parent, "LightBeam", beamMesh, beamMat, lExt, false);
+            beam.transform.localPosition = new Vector3(0, 0, 0.05f);
             beam.transform.localRotation = Quaternion.Euler(4f, 0, 0);
             beam.GetComponent<Renderer>().enabled = false;
             beams.Add(beam.GetComponent<Renderer>());
@@ -950,7 +972,7 @@ public static class BlackBusBuilder
         dep.headlights = lights.ToArray(); dep.beams = beams.ToArray(); dep.ledStrips = headlightLeds;
         dep.portal = root.GetComponent<BusPortal>();
         dep.dashGlow = dashGlow; dep.speedBar = speedBar; dep.dashColor = Sapphire * 1.4f;
-        foreach (var r in headlightLeds) r.enabled = false;
+
         log.AppendLine("  departure: rear shutter, inner door, 2 headlights + beams");
     }
 
@@ -1438,6 +1460,7 @@ public static class BlackBusBuilder
         box.center = Vector3.zero;
         box.size = new Vector3(InHalfW * 2f, CeilY - FloorY + 0.6f, z1 - z0);
         vp.bus = bus.GetComponent<BusDeparture>();
+        vp.countdown = 10f; vp.fadeTime = 1.5f;   // 10 с ожидания экипажа, 5 с поездки, затемнение — последние 1.5 с
         EditorUtility.SetDirty(vp); EditorUtility.SetDirty(box);
 
         var txt = vp.countdownText;

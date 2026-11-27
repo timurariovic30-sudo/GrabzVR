@@ -148,9 +148,10 @@ public class GrabzComputer : MonoBehaviour
             case "ITEMS":
                 if (opt == 2)
                 {
-                    // балаклава: нет → чёрная → белая → нет
+                    // балаклава: нет → чёрная → белая → серая → нет
                     if (GameSession.IsWorn("RobberMask")) ToggleItem("RobberMaskWhite");
-                    else if (GameSession.IsWorn("RobberMaskWhite")) ToggleItem("RobberMaskWhite");
+                    else if (GameSession.IsWorn("RobberMaskWhite")) ToggleItem("RobberMaskGray");
+                    else if (GameSession.IsWorn("RobberMaskGray")) ToggleItem("RobberMaskGray");
                     else ToggleItem("RobberMask");
                 }
                 else if (opt == 1 || opt == 3) ToggleItem(ItemIds[opt - 1]);
@@ -253,8 +254,8 @@ public class GrabzComputer : MonoBehaviour
             case "ITEMS":
                 for (int i = 0; i < 3; i++)
                 {
-                    string id = i == 1 && GameSession.IsWorn("RobberMaskWhite") ? "RobberMaskWhite" : ItemIds[i];
-                    string name = i == 1 ? (id == "RobberMaskWhite" ? "БАЛАКЛАВА: БЕЛАЯ" : "БАЛАКЛАВА: ЧЁРНАЯ / БЕЛАЯ") : ItemNames[i];
+                    string id = i == 1 && GameSession.IsWorn("RobberMaskWhite") ? "RobberMaskWhite" : i == 1 && GameSession.IsWorn("RobberMaskGray") ? "RobberMaskGray" : ItemIds[i];
+                    string name = i == 1 ? (id == "RobberMaskWhite" ? "БАЛАКЛАВА: БЕЛАЯ" : id == "RobberMaskGray" ? "БАЛАКЛАВА: СЕРАЯ" : "БАЛАКЛАВА: ЧЁРНАЯ / БЕЛАЯ / СЕРАЯ") : ItemNames[i];
                     s.AppendLine((GameSession.IsWorn(id) ? "> " : "  ") + $"OPTION {i + 1}: {name}" + (GameSession.IsWorn(id) ? "  [НАДЕТО]" : ""));
                 }
                 s.AppendLine("<size=70%>КОРОНА, МАСКА И ЦЕПЬ НАДЕВАЮТСЯ ВМЕСТЕ</size>");

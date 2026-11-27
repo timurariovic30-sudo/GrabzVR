@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using TMPro;
 using UnityEditor;
 using UnityEditor.Events;
@@ -91,8 +91,8 @@ public static class HubTableAndShowcaseFix
         {
             var spanel = show.Find("Panel");
             // убрать прошлую копию белой балаклавы
-            foreach (var n in new[] { "Stand_3", "Sample_3", "PriceTag_3" }) { var t = show.Find(n); if (t) Object.DestroyImmediate(t.gameObject); }
-            var oldBtn = spanel ? spanel.Find("Button_TryOn_3") : null; if (oldBtn) Object.DestroyImmediate(oldBtn.gameObject);
+            foreach (var n in new[] { "Stand_3", "Sample_3", "PriceTag_3", "Stand_4", "Sample_4", "PriceTag_4" }) { var t = show.Find(n); if (t) Object.DestroyImmediate(t.gameObject); }
+            foreach (var n in new[] { "Button_TryOn_3", "Button_TryOn_4" }) { var oldBtn = spanel ? spanel.Find(n) : null; if (oldBtn) Object.DestroyImmediate(oldBtn.gameObject); }
 
             // клон «чёрной» позиции → белая
             Transform Clone(Transform src, string name)
@@ -122,9 +122,30 @@ public static class HubTableAndShowcaseFix
             }
             var bpb = spanel.Find("Button_TryOn_1").GetComponent<PushButton>(); bpb.label = "ЧЁРНАЯ БАЛАКЛАВА"; EditorUtility.SetDirty(bpb);
 
+            // серая балаклава (#6E7178) — ещё одна копия «чёрной» позиции
+            Clone(show.Find("Stand_1"), "Stand_4");
+            Clone(show.Find("Sample_1"), "Sample_4");
+            Clone(show.Find("PriceTag_1"), "PriceTag_4");
+            var gbtn = Clone(spanel.Find("Button_TryOn_1"), "Button_TryOn_4");
+            var gpb = gbtn.GetComponent<PushButton>();
+            while (gpb.onPressed.GetPersistentEventCount() > 0) UnityEventTools.RemovePersistentListener(gpb.onPressed, 0);
+            UnityEventTools.AddVoidPersistentListener(gpb.onPressed, hub.TryOnRobberMaskGray);
+            gpb.label = "СЕРАЯ БАЛАКЛАВА";
+            var gcap = gbtn.Find("Cap")?.GetComponent<MeshRenderer>();
+            if (gcap)
+            {
+                const string gPath = "Assets/Art/Materials/Hub/M_Hub_Btn_BalaclavaGray.mat";
+                var m = AssetDatabase.LoadAssetAtPath<Material>(gPath);
+                if (!m) { m = new Material(gcap.sharedMaterial); AssetDatabase.CreateAsset(m, gPath); }
+                m.SetColor("_BaseColor", new Color32(0x6E, 0x71, 0x78, 0xFF));
+                m.SetColor("_EmissionColor", new Color(0.15f, 0.15f, 0.17f));
+                EditorUtility.SetDirty(m);
+                gcap.sharedMaterial = m;
+            }
+
             // раскладка слева направо (для зрителя): корона, чёрная, белая, цепь
-            var order = new[] { (0, 0.84f), (1, 0.28f), (3, -0.28f), (2, -0.84f) };
-            string[] tags = { "КОРОНА", "ЧЁРНАЯ БАЛАКЛАВА", "ЗОЛОТАЯ ЦЕПЬ", "БЕЛАЯ БАЛАКЛАВА" };
+            var order = new[] { (0, 0.88f), (1, 0.44f), (3, 0f), (4, -0.44f), (2, -0.88f) };
+            string[] tags = { "КОРОНА", "ЧЁРНАЯ БАЛАКЛАВА", "ЗОЛОТАЯ ЦЕПЬ", "БЕЛАЯ БАЛАКЛАВА", "СЕРАЯ БАЛАКЛАВА" };
             foreach (var (i, x) in order)
             {
                 void SetX(Transform t) { if (!t) return; var p = t.localPosition; p.x = x; t.localPosition = p; if (t is RectTransform rt) rt.anchoredPosition3D = p; }
@@ -134,11 +155,11 @@ public static class HubTableAndShowcaseFix
                 {
                     SetX(tag.transform);
                     tag.text = tags[i] + "\n<size=70%>ПРИМЕРИТЬ БЕСПЛАТНО</size>";
-                    tag.rectTransform.sizeDelta = new Vector2(0.52f, 0.2f);
+                    tag.rectTransform.sizeDelta = new Vector2(0.42f, 0.2f);
                     EditorUtility.SetDirty(tag);
                 }
             }
-            log.AppendLine("  showcase: crown, black balaclava, white balaclava, chain");
+            log.AppendLine("  showcase: crown, black / white / gray balaclava, chain");
         }
         EditorSceneManager.MarkSceneDirty(hub.gameObject.scene);
         if (openScene) EditorSceneManager.SaveScene(hub.gameObject.scene);

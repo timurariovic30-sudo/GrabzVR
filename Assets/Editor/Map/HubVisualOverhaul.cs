@@ -519,6 +519,12 @@ public static class HubVisualOverhaul
         var shaftGo = Box(g, "LightShaft", from + dir * 0.5f, new Vector3(w * 0.9f, h * 0.9f, dir.magnitude), shaft, 0, false,
             Quaternion.LookRotation(dir, Vector3.up));
         shaftGo.GetComponent<MeshRenderer>().sharedMaterial = shaft;
+        // жёсткий луч выключен — вместо него мягкий спот (HubWindowLightFix)
+        shaftGo.SetActive(false);
+        var soft = new GameObject("WindowSoftLight");
+        soft.transform.SetParent(g, false);
+        soft.transform.SetPositionAndRotation(wallPoint + inward * 0.5f, Quaternion.LookRotation(dir, Vector3.up));
+        HubWindowLightFix.AddSpot(soft);
     }
 
     static void BuildWindows(Transform st)

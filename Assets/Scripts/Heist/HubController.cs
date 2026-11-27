@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -82,6 +82,7 @@ public class HubController : MonoBehaviour
     public void TryOnCrown() => TryOn("Crown");
     public void TryOnRobberMask() => TryOn("RobberMask");
     public void TryOnRobberMaskWhite() => TryOn("RobberMaskWhite");
+    public void TryOnRobberMaskGray() => TryOn("RobberMaskGray");
     public void TryOnGoldChain() => TryOn("GoldChain");
 
     /// Повторное нажатие той же кнопки снимает предмет. Головной убор, маска и цепь — разные слоты
@@ -98,6 +99,7 @@ public class HubController : MonoBehaviour
         "Crown" => "КОРОНА",
         "RobberMask" => "ЧЁРНАЯ БАЛАКЛАВА",
         "RobberMaskWhite" => "БЕЛАЯ БАЛАКЛАВА",
+        "RobberMaskGray" => "СЕРАЯ БАЛАКЛАВА",
         "GoldChain" => "ЗОЛОТАЯ ЦЕПЬ",
         _ => id,
     };
