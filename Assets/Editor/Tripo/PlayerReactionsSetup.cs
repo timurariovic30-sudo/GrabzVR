@@ -35,8 +35,14 @@ public static class PlayerReactionsSetup
     const float Cx = 0.004f;
     const float EyeDx = 0.0625f, EyeY = 1.464f;
     const float MouthY = 1.314f;
-    static readonly Vector3 LidRadii = new Vector3(0.047f, 0.033f, 0.03f);
-    const float LidBehind = 0.022f;                // центр век позади поверхности глаза
+    // объёмный глаз: выпуклый эллипсоид, центр чуть позади нарисованного глаза → выступает из глазницы на ~1.8 см
+    static readonly Vector3 EyeballRadii = new Vector3(0.05f, 0.036f, 0.03f);
+    const float EyeCenterBehind = 0.012f;
+    const float LidInner = 0.92f;                  // толщина века: внутренняя поверхность = 0.92 внешней
+    // веки охватывают глаз с зазором 5 мм — закрытое веко не протыкают зрачок и блик
+    const float LidGap = 0.005f;
+    static readonly Vector3 LidRadii = (EyeballRadii + Vector3.one * LidGap) / LidInner;
+    static readonly Vector3 PupilSize = new Vector3(0.036f, 0.04f, 0.004f);
 
     static readonly StringBuilder log = new StringBuilder();
 
@@ -201,21 +207,23 @@ public static class PlayerReactionsSetup
 
         // ---- глаза и брови
         var parts = new GorillaFaceEmotes.EyeParts[2];
-        var browR = new List<Renderer>(); var wideR = new List<Renderer>();
+        var browR = new List<Renderer>();
+        var gazeEyes = new GorillaEyeGaze.Eye[2];
         for (int s = 0; s < 2; s++)
         {
             string tag = s == 0 ? "L" : "R";
             float side = s == 0 ? -1f : 1f;
-            var eye = Node("Eye_" + tag, faceRoot, P(lay.eye[s] - Vector3.forward * LidBehind), R(Vector3.forward), Vector3.one, layer);
+            var eye = Node("Eye_" + tag, faceRoot, P(lay.eye[s] - Vector3.forward * EyeCenterBehind), R(Vector3.forward), Vector3.one, layer);
+            var ball = Ball("Eyeball", eye, Vector3.zero, Quaternion.identity, EyeballRadii * 2f, mats["EyeWhite"], layer);
+            var pupil = Ball("Pupil", eye, new Vector3(0f, 0f, EyeballRadii.z), Quaternion.identity, PupilSize, mats["Pupil"], layer);
+            Ball("Glint", pupil, new Vector3(0.24f, 0.26f, 0.45f), Quaternion.identity, new Vector3(0.28f, 0.26f, 0.4f), mats["Glint"], layer);
             var lids = Node("Lids", eye, Vector3.zero, Quaternion.identity, LidRadii, layer);
             var up = MeshNode("UpperLid", lids, lidUpper, mats["Lid"], layer);
             var lo = MeshNode("LowerLid", lids, lidLower, mats["Lid"], layer);
-            var wide = Ball("WideEye", eye, new Vector3(0f, 0f, LidBehind + 0.004f), Quaternion.identity, new Vector3(0.1f, 0.07f, 0.03f), mats["EyeWhite"], layer);
-            var pupil = Ball("Pupil", wide, new Vector3(0f, 0f, 0.42f), Quaternion.identity, new Vector3(0.26f, 0.36f, 0.3f), mats["Pupil"], layer);
             var brow = Ball("Brow_" + tag, faceRoot, P(lay.brow[s]), R(lay.browFwd[s]), new Vector3(0.085f, 0.022f, 0.024f), mats["Brow"], layer);
             browR.Add(brow.GetComponent<Renderer>());
-            wideR.Add(wide.GetComponent<Renderer>()); wideR.Add(pupil.GetComponent<Renderer>());
-            parts[s] = new GorillaFaceEmotes.EyeParts { upperLid = up, lowerLid = lo, brow = brow, wideEye = wide, side = side };
+            gazeEyes[s] = new GorillaEyeGaze.Eye { anchor = eye, eyeball = ball, pupil = pupil };
+            parts[s] = new GorillaFaceEmotes.EyeParts { upperLid = up, lowerLid = lo, brow = brow, side = side };
         }
 
         // ---- компоненты
@@ -229,7 +237,10 @@ public static class PlayerReactionsSetup
         if (!emotes) emotes = go.AddComponent<GorillaFaceEmotes>();
         emotes.left = parts[0]; emotes.right = parts[1];
         emotes.browRenderers = browR.ToArray();
-        emotes.wideEyeRenderers = wideR.ToArray();
+        emotes.normal = GorillaFaceEmotes.DefaultNormal;
+        emotes.strain = GorillaFaceEmotes.DefaultStrain;
+        emotes.scared = GorillaFaceEmotes.DefaultScared;
+        emotes.knockedOut = GorillaFaceEmotes.DefaultKnockedOut;
         var netAv = rig.GetComponentInParent<NetworkGorillaAvatar>(true);
         emotes.skin = netAv && netAv.skin ? netAv.skin : rig.transform.root.GetComponentInChildren<PlayerSkinController>(true);
 
@@ -237,10 +248,17 @@ public static class PlayerReactionsSetup
         if (!fall) fall = go.AddComponent<GorillaFallRagdoll>();
         fall.rig = rig;
 
-        // закрытый рот и спрятанные испуганные глаза по умолчанию
+        var gaze = go.GetComponent<GorillaEyeGaze>();
+        if (!gaze) gaze = go.AddComponent<GorillaEyeGaze>();
+        gaze.rig = rig;
+        gaze.left = gazeEyes[0]; gaze.right = gazeEyes[1];
+        gaze.radii = EyeballRadii;
+        emotes.gaze = gaze;
+
+        // закрытый рот, обычное лицо, взгляд прямо
         foreach (var r in mouthC.mouthRenderers) r.enabled = false;
-        foreach (var r in wideR) r.enabled = false;
         emotes.PreviewPose(FaceEmote.Normal);
+        gaze.PreviewLook(Vector3.forward, 0f);
         EditorUtility.SetDirty(go);
 
         int missing = new[] { "Hips", "Spine", "Chest", "Head", "Left_UpperArm", "Left_LowerArm", "Left_UpperLeg", "Left_LowerLeg" }
@@ -284,7 +302,7 @@ public static class PlayerReactionsSetup
     static Mesh LidMesh(bool upper)
     {
         const int Lon = 20, Lat = 10;
-        const float Inner = 0.86f, PhiMax = 115f;
+        const float Inner = LidInner, PhiMax = 115f;
         float sgn = upper ? 1f : -1f;
         var v = new List<Vector3>(); var tri = new List<int>();
         Vector3 S(float lon, float phi, float r)
@@ -387,6 +405,7 @@ public static class PlayerReactionsSetup
             ["Teeth"] = M("Teeth", lit, new Color(0.95f, 0.94f, 0.88f), 0.2f),
             ["EyeWhite"] = M("EyeWhite", lit, new Color(0.97f, 0.97f, 0.95f), 0.5f),
             ["Pupil"] = M("Pupil", lit, new Color(0.02f, 0.02f, 0.025f), 0.6f),
+            ["Glint"] = M("Glint", unlit, new Color(1f, 1f, 1f), 0f),               // блик в зрачке
         };
     }
 
@@ -425,18 +444,22 @@ public static class PlayerReactionsSetup
             var tex = new Texture2D(Size, Size, TextureFormat.RGB24, false);
             var center = new Vector3(Cx, 1.40f, 0f);
 
-            var shots = new (string name, FaceEmote e, float mouthOpen, Vector3 dir)[]
+            var gaze = rig.GetComponent<GorillaEyeGaze>();
+            var shots = new (string name, FaceEmote e, float mouthOpen, Vector3 dir, Vector3 look)[]
             {
-                ("normal", FaceEmote.Normal, 0f, new Vector3(0f, 0.05f, 1f)),
-                ("talking", FaceEmote.Normal, 0.85f, new Vector3(0f, 0.05f, 1f)),
-                ("strain", FaceEmote.Strain, 0f, new Vector3(0f, 0.05f, 1f)),
-                ("scared", FaceEmote.Scared, 0.6f, new Vector3(0f, 0.05f, 1f)),
-                ("knockedout", FaceEmote.KnockedOut, 0f, new Vector3(0f, 0.05f, 1f)),
-                ("scared_threequarter", FaceEmote.Scared, 0.6f, new Vector3(0.75f, 0.12f, 1f)),
+                ("normal", FaceEmote.Normal, 0f, new Vector3(0f, 0.05f, 1f), Vector3.forward),
+                ("look_side", FaceEmote.Normal, 0f, new Vector3(0f, 0.05f, 1f), new Vector3(0.6f, 0.15f, 1f)),
+                ("talking", FaceEmote.Normal, 0.85f, new Vector3(0f, 0.05f, 1f), Vector3.forward),
+                ("strain", FaceEmote.Strain, 0f, new Vector3(0f, 0.05f, 1f), new Vector3(0f, -0.2f, 1f)),
+                ("scared", FaceEmote.Scared, 0.6f, new Vector3(0f, 0.05f, 1f), Vector3.forward),
+                ("knockedout", FaceEmote.KnockedOut, 0f, new Vector3(0f, 0.05f, 1f), Vector3.forward),
+                ("threequarter", FaceEmote.Normal, 0f, new Vector3(0.75f, 0.12f, 1f), new Vector3(0.7f, 0.1f, 1f)),
+                ("side", FaceEmote.Normal, 0f, new Vector3(1f, 0.05f, 0.1f), Vector3.forward),
             };
             foreach (var s in shots)
             {
                 emotes.PreviewPose(s.e);
+                if (gaze) gaze.PreviewLook(s.look, emotes.PoseOf(s.e).wide);
                 mouth.PreviewOpen(s.mouthOpen);
                 var dn = s.dir.normalized;
                 cgo.transform.position = center + dn * 0.95f; cgo.transform.rotation = Quaternion.LookRotation(-dn);

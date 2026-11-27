@@ -14,7 +14,7 @@ public enum FaceEmote : byte
 ///  • Веки — тонкие сферические «скорлупки» вокруг глаза; закрываются поворотом вокруг горизонтальной оси,
 ///    как настоящие (уголки глаз остаются на месте). Цвет — серая кожа морды.
 ///  • Брови — пучки шерсти над глазами в цвет шерсти (темнее), поднимаются, опускаются и наклоняются.
-///  • Испуг — поверх нарисованных глаз «выпрыгивают» большие белки с маленькими зрачками.
+///  • Глаза — объёмные (GorillaEyeGaze): при испуге выпучиваются, зрачки сужаются.
 /// Выражение решает локальный игрок: нокаут &gt; падение &gt; тревога &gt; тяжёлый лут &gt; обычное.
 /// Сетевая горилла показывает то, что пришло в [Networked] FaceEmote, — у всех одинаково, и в зеркале тоже.
 /// Объекты лица собирает Tools/Heist/Player/Reactions (PlayerReactionsSetup).
@@ -31,12 +31,10 @@ public class GorillaFaceEmotes : MonoBehaviour
         public Transform lowerLid;
         [Tooltip("Бровь (ось Z смотрит из лица наружу)")]
         public Transform brow;
-        [Tooltip("Большой испуганный глаз (белок + зрачок), обычно спрятан")]
-        public Transform wideEye;
         [Tooltip("-1 — левый глаз (x < 0), +1 — правый")]
         public float side = -1f;
 
-        [HideInInspector] public Vector3 browPos, wideScale;
+        [HideInInspector] public Vector3 browPos;
         [HideInInspector] public Quaternion browRot;
         [HideInInspector] public bool cached;
     }
@@ -57,18 +55,24 @@ public class GorillaFaceEmotes : MonoBehaviour
     public EyeParts right = new EyeParts { side = 1f };
     [Tooltip("Рендеры бровей — перекрашиваются в цвет шерсти")]
     public Renderer[] browRenderers;
-    [Tooltip("Рендеры испуганных глаз — включены только при испуге")]
-    public Renderer[] wideEyeRenderers;
+    [Tooltip("Объёмные глаза: испуг выпучивает их и сужает зрачки")]
+    public GorillaEyeGaze gaze;
     [Tooltip("Шерсть этой гориллы (цвет бровей)")]
     public PlayerSkinController skin;
     [Range(0f, 1f), Tooltip("Брови темнее шерсти")]
     public float browDarken = 0.55f;
 
     [Header("Выражения")]
-    public Pose normal = new Pose(36f, 62f, 0f, 4f, 0f);
-    public Pose strain = new Pose(8f, 26f, -0.008f, 24f, 0f);
-    public Pose scared = new Pose(82f, 82f, 0.017f, -16f, 1f);
-    public Pose knockedOut = new Pose(-4f, 4f, -0.004f, -8f, 0f);
+    public Pose normal = DefaultNormal;
+    public Pose strain = DefaultStrain;
+    public Pose scared = DefaultScared;
+    public Pose knockedOut = DefaultKnockedOut;
+
+    // веки охватывают объёмный глаз: 0° — край века на середине глаза, 90° — веко спрятано в глазнице
+    public static readonly Pose DefaultNormal = new Pose(52f, 64f, 0f, 4f, 0f);
+    public static readonly Pose DefaultStrain = new Pose(16f, 32f, -0.008f, 24f, 0f);
+    public static readonly Pose DefaultScared = new Pose(88f, 88f, 0.017f, -16f, 1f);
+    public static readonly Pose DefaultKnockedOut = new Pose(-4f, 4f, -0.004f, -8f, 0f);
     [Tooltip("Скорость смены выражения (1/с)")]
     public float blendSpeed = 14f;
 
@@ -90,7 +94,7 @@ public class GorillaFaceEmotes : MonoBehaviour
     NetworkGorillaAvatar net;
     GorillaFallRagdoll fall;
     Pose shown;
-    float nextBlink, blinkUntil, scaredUntil, wideShown;
+    float nextBlink, blinkUntil, scaredUntil;
     Color shownBrowColor = new Color(-1, -1, -1);
     MaterialPropertyBlock block;
     static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -101,10 +105,10 @@ public class GorillaFaceEmotes : MonoBehaviour
         fall = GetComponent<GorillaFallRagdoll>();
         if (!skin) skin = GetComponentInParent<PlayerSkinController>(true);
         if (!skin) skin = transform.root.GetComponentInChildren<PlayerSkinController>(true);
+        if (!gaze) gaze = GetComponent<GorillaEyeGaze>();
         Cache(left); Cache(right);
         shown = normal;
         nextBlink = Time.time + Random.Range(blinkInterval.x, blinkInterval.y);
-        SetWideRenderers(false);
         ApplyPose(shown, 0f);
     }
 
@@ -112,7 +116,6 @@ public class GorillaFaceEmotes : MonoBehaviour
     {
         if (e.cached) return;
         if (e.brow) { e.browPos = e.brow.localPosition; e.browRot = e.brow.localRotation; }
-        if (e.wideEye) e.wideScale = e.wideEye.localScale;
         e.cached = true;
     }
 
@@ -161,7 +164,7 @@ public class GorillaFaceEmotes : MonoBehaviour
         shown.lowerLid = Mathf.Lerp(shown.lowerLid, target.lowerLid, lidK);
         shown.browRaise = Mathf.Lerp(shown.browRaise, target.browRaise, k);
         shown.browInnerDown = Mathf.Lerp(shown.browInnerDown, target.browInnerDown, k);
-        // испуганные глаза «выпрыгивают» быстро, прячутся медленнее
+        // глаза выпучиваются быстро, успокаиваются медленнее
         float wk = 1f - Mathf.Exp(-(target.wide > shown.wide ? 22f : 9f) * Time.deltaTime);
         shown.wide = Mathf.Lerp(shown.wide, target.wide, wk);
 
@@ -190,19 +193,13 @@ public class GorillaFaceEmotes : MonoBehaviour
             e.brow.localPosition = e.browPos + e.browRot * Vector3.up * (p.browRaise + tremble);
             e.brow.localRotation = e.browRot * Quaternion.Euler(0f, 0f, angle);
         }
-        if (e.wideEye)
-        {
-            float s = EaseOutBack(Mathf.Clamp01(p.wide));
-            e.wideEye.localScale = e.wideScale * Mathf.Max(0.001f, s);
-        }
     }
 
     void ApplyPose(Pose p, float tremble)
     {
         ApplyEye(left, p, tremble);
         ApplyEye(right, p, tremble);
-        bool wide = p.wide > 0.03f;
-        if (wide != (wideShown > 0f)) { SetWideRenderers(wide); wideShown = wide ? 1f : 0f; }
+        if (gaze) gaze.Fear = p.wide;
     }
 
     /// Показать выражение сразу, без анимации (превью и снимки в редакторе).
@@ -212,20 +209,7 @@ public class GorillaFaceEmotes : MonoBehaviour
         var p = PoseOf(e);
         ApplyEye(left, p, 0f);
         ApplyEye(right, p, 0f);
-        if (wideEyeRenderers != null) foreach (var r in wideEyeRenderers) if (r) r.enabled = p.wide > 0.03f;
-    }
-
-    static float EaseOutBack(float t)
-    {
-        const float c1 = 1.9f, c3 = c1 + 1f;
-        float u = t - 1f;
-        return 1f + c3 * u * u * u + c1 * u * u;
-    }
-
-    void SetWideRenderers(bool on)
-    {
-        if (wideEyeRenderers == null) return;
-        foreach (var r in wideEyeRenderers) if (r) r.enabled = on;
+        if (gaze) gaze.Fear = p.wide;
     }
 
     void UpdateBrowColor()
