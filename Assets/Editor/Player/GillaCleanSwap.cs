@@ -23,7 +23,11 @@ using Object = UnityEngine.Object;
 /// </summary>
 public static class GillaCleanSwap
 {
-    const string ModelPath = "Assets/Art/Models/Gorilla_GillaClean.fbx";
+    const string GillaPath = "Assets/Art/Models/Gorilla_GillaClean.fbx";
+    public const string Final3FPath = "Assets/Art/GeneratedModels/Gorilla_Final/Gorilla_Final_3F.fbx";
+    static string ModelPath = GillaPath;
+    static Vector3 rotOffsetL, rotOffsetR;      // поворот кисти относительно контроллера (зависит от осей костей модели)
+    static string shotPrefix = "gilla";
     const string OutDir = "Assets/Art/Models/GillaClean";
     const string VRPrefab = "Assets/Prefabs/Player/VRGorillaPlayer.prefab";
     const string NetPrefab = "Assets/Prefabs/Network/NetworkGorillaAvatar.prefab";
@@ -36,6 +40,27 @@ public static class GillaCleanSwap
 
     [MenuItem("Tools/Heist/Player/Swap To Gilla Clean Model")]
     static void Menu() => Debug.Log(Run(true));
+
+    /// Обновлённая Gorilla_Final (Tripo-форма, 3 толстых пальца, чистый мех) — Assets/Art/GeneratedModels/Gorilla_Final/Source/upgrade_gorilla_final.py.
+    [MenuItem("Tools/Heist/Player/Swap To Gorilla Final (3 fingers)")]
+    static void MenuFinal() => Debug.Log(RunFinal());
+
+    public static string RunFinal()
+    {
+        ModelPath = Final3FPath; shotPrefix = "final3f";
+        rotOffsetL = new Vector3(0, 0, -90); rotOffsetR = new Vector3(0, 0, -66);   // как у прежней Gorilla_Final (оси Tripo-кистей)
+        try { return Run(true); }
+        finally { ModelPath = GillaPath; shotPrefix = "gilla"; rotOffsetL = rotOffsetR = Vector3.zero; }
+    }
+
+    public static void RunFinalBatch()
+    {
+        string r;
+        try { r = RunFinal(); }
+        catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); return; }
+        Debug.Log(r);
+        EditorApplication.Exit(r.Contains("ERROR: no") || r.Contains("ERROR " ) ? 1 : 0);
+    }
 
     public static void RunBatch()
     {
@@ -225,7 +250,7 @@ public static class GillaCleanSwap
         rig.left.upper = B("Left_UpperArm"); rig.left.lower = B("Left_LowerArm"); rig.left.hand = B("Left_Hand");
         rig.right.upper = B("Right_UpperArm"); rig.right.lower = B("Right_LowerArm"); rig.right.hand = B("Right_Hand");
         rig.left.palmOffset = rig.right.palmOffset = palm;
-        rig.left.rotationOffset = Vector3.zero; rig.right.rotationOffset = Vector3.zero;   // чистый риг: ладонь вниз в T-позе
+        rig.left.rotationOffset = rotOffsetL; rig.right.rotationOffset = rotOffsetR;
         rig.mirrorRightFromLeft = true;
         EditorUtility.SetDirty(rig);
         var root = scopeRoot ? scopeRoot : avatar.root;
@@ -305,8 +330,8 @@ public static class GillaCleanSwap
             for (int i = 0; i < 2; i++) cam.Render();          // первый кадр в batchmode без света
             RenderTexture.active = rt; var t = new Texture2D(1000, 1000, TextureFormat.RGB24, false); t.ReadPixels(new Rect(0, 0, 1000, 1000), 0, 0); t.Apply();
             if (mirror) { var px = t.GetPixels(); var o = new Color[px.Length]; for (int y = 0; y < 1000; y++) for (int x = 0; x < 1000; x++) o[y * 1000 + x] = px[y * 1000 + 999 - x]; t.SetPixels(o); t.Apply(); }
-            File.WriteAllBytes($"production/qa/evidence/gilla_{name}.png", t.EncodeToPNG()); Object.DestroyImmediate(t);
-            log.AppendLine($"  shot production/qa/evidence/gilla_{name}.png");
+            File.WriteAllBytes($"production/qa/evidence/{shotPrefix}_{name}.png", t.EncodeToPNG()); Object.DestroyImmediate(t);
+            log.AppendLine($"  shot production/qa/evidence/{shotPrefix}_{name}.png");
         }
         // крупный план: голова + грудь
         Vector3 bust = a.position + Vector3.down * 0.16f;
