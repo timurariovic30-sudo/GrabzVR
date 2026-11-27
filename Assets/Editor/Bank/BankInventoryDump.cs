@@ -58,6 +58,30 @@ public static class BankInventoryDump
         EditorApplication.Exit(0);
     }
 
+    /// Состав статических групп Хаба (имя, габариты, слой, коллайдеры) → Logs/HubStatic.txt
+    public static void HubStaticDump()
+    {
+        UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/Scenes/MainHub.unity");
+        var sb = new StringBuilder();
+        foreach (var path in new[] { "MainHubMap/Static", "MainHubMap/Lights", "MainHubMap/Dynamic", "HubDecor/Static", "HubDecor/Lighting", "BusTunnel" })
+        {
+            var g = GameObject.Find(path);
+            if (!g) { sb.AppendLine("NO " + path); continue; }
+            sb.AppendLine("== " + path);
+            foreach (Transform c in g.transform)
+            {
+                var rs = c.GetComponentsInChildren<Renderer>(true);
+                var b = rs.Length > 0 ? rs[0].bounds : new Bounds(c.position, Vector3.zero);
+                foreach (var r in rs) b.Encapsulate(r.bounds);
+                var lights = c.GetComponentsInChildren<Light>(true).Length;
+                var cols = c.GetComponentsInChildren<Collider>(true).Length;
+                sb.AppendLine($"  {c.name} [{LayerMask.LayerToName(c.gameObject.layer)}] min({b.min.x:F1},{b.min.y:F1},{b.min.z:F1}) max({b.max.x:F1},{b.max.y:F1},{b.max.z:F1}) r{rs.Length} col{cols}{(lights > 0 ? " light" + lights : "")}{(c.gameObject.activeSelf ? "" : " OFF")}");
+            }
+        }
+        System.IO.File.WriteAllText("Logs/HubStatic.txt", sb.ToString());
+        EditorApplication.Exit(0);
+    }
+
     public static void KitNormals()
     {
         var sb = new StringBuilder();
