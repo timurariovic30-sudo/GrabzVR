@@ -31,6 +31,10 @@ public class GorillaFallRagdoll : MonoBehaviour
     public float stopWindow = 0.15f;
     [Tooltip("Сдвиг камеры за кадр больше этого — телепорт (смена сцены, спавн), не падение")]
     public float teleportDistance = 1.5f;
+    [Tooltip("Окно, по которому считается скорость падения (с) — сглаживает рывки камеры за один кадр")]
+    public float speedWindow = 0.06f;
+    [Tooltip("Сколько секунд скорость падения должна держаться выше impactSpeed, чтобы это считалось падением")]
+    public float minFastFall = 0.08f;
 
     [Header("Нокаут")]
     public float knockoutDuration = 2.5f;
@@ -100,7 +104,8 @@ public class GorillaFallRagdoll : MonoBehaviour
     AudioSource audioSource;
     Vector3 lastHeadPos;
     bool hasLastHead;
-    float fastFallUntil;
+    float fastFallUntil, fastFallTime;
+    readonly Queue<(float t, float y)> samples = new Queue<(float t, float y)>();
     Transform hips;
     Vector3 hipsSnapWorldPos;
     Quaternion hipsSnapWorldRot;
@@ -157,22 +162,36 @@ public class GorillaFallRagdoll : MonoBehaviour
         if (!hasLastHead) { lastHeadPos = p; hasLastHead = true; return; }
         Vector3 d = p - lastHeadPos;
         lastHeadPos = p;
-        if (d.magnitude > teleportDistance) { VerticalSpeed = 0f; fastFallUntil = 0f; return; }
+        float now = Time.time;
+        if (d.magnitude > teleportDistance) { VerticalSpeed = 0f; fastFallUntil = 0f; fastFallTime = 0f; samples.Clear(); return; }
 
-        float vy = d.y / Time.deltaTime;
+        // скорость — по окну ~speedWindow секунд, а не по одному кадру: рывок камеры за кадр (перецентровка шлема,
+        // скачок частоты кадров, резкий мах рукой) не выглядит как падение
+        samples.Enqueue((now, p.y));
+        while (samples.Count > 2 && now - samples.Peek().t > speedWindow) samples.Dequeue();
+        var (t0, y0) = samples.Peek();
+        float vy = now - t0 > 1e-4f ? (p.y - y0) / (now - t0) : 0f;
         VerticalSpeed = Mathf.Lerp(VerticalSpeed, vy, 1f - Mathf.Exp(-25f * Time.deltaTime));
-        if (IsImpact(vy, impactSpeed, stopFraction, Time.time, ref fastFallUntil, stopWindow) && phase == Phase.None)
+        if (IsImpact(vy, impactSpeed, stopFraction, now, Time.deltaTime, minFastFall, ref fastFallTime, ref fastFallUntil, stopWindow) && phase == Phase.None)
         {
             KnockoutCount++;
             StartKnockout();
         }
     }
 
-    /// Чистое правило удара: была скорость вниз ≥ impact, и за window секунд она упала ниже impact × stopFraction.
-    public static bool IsImpact(float vy, float impact, float stopFraction, float now, ref float fastFallUntil, float window)
+    /// Чистое правило удара: скорость вниз ≥ impact держалась не меньше minFastFall секунд (настоящее падение, а не рывок),
+    /// и затем за window секунд упала ниже impact × stopFraction (резкая остановка о землю).
+    public static bool IsImpact(float vy, float impact, float stopFraction, float now, float dt, float minFastFall,
+                                ref float fastFallTime, ref float fastFallUntil, float window)
     {
-        if (-vy >= impact) { fastFallUntil = now + window; return false; }
-        if (now <= fastFallUntil && -vy < impact * stopFraction) { fastFallUntil = 0f; return true; }
+        if (-vy >= impact)
+        {
+            fastFallTime += dt;
+            if (fastFallTime >= minFastFall) fastFallUntil = now + window;
+            return false;
+        }
+        if (-vy < impact * 0.7f) fastFallTime = 0f;
+        if (now <= fastFallUntil && -vy < impact * stopFraction) { fastFallUntil = 0f; fastFallTime = 0f; return true; }
         return false;
     }
 
@@ -281,7 +300,7 @@ public class GorillaFallRagdoll : MonoBehaviour
             lockedGorilla.enabled = true;
         }
         if (lockedDesktop) lockedDesktop.enabled = true;
-        hasLastHead = false;                                    // подъём камеры — не падение
+        hasLastHead = false; samples.Clear(); fastFallTime = 0f; fastFallUntil = 0f;   // подъём камеры — не падение
         lockedGorilla = null; lockedDesktop = null; lockedStick = null; lockedBody = null; viewOffset = null;
     }
 

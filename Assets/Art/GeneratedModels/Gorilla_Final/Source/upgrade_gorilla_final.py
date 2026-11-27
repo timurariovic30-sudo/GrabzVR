@@ -86,6 +86,21 @@ for P, W0 in (("Left_", WL0), ("Right_", WR0)):
     ax = (W0 - bw(P + "LowerArm")).normalized(); plane = W0 - ax * 0.05 * K; cut_info[P] = (plane, ax)
     gone = [f for f in bm.faces if (f.calc_center_median() - plane).dot(ax) > 0 and abs(f.calc_center_median().x) > abs(W0.x) * 0.6]
     bmesh.ops.delete(bm, geom=gone, context="FACES")
+# торчащие «лоскутки» шерсти перед срезом: всё, что дальше 1.15 медианного радиуса от оси предплечья
+for P, W0 in (("Left_", WL0), ("Right_", WR0)):
+    plane, ax = cut_info[P]; base = bw(P + "LowerArm")
+    near = [f for f in bm.faces if -0.25 * K < (f.calc_center_median() - plane).dot(ax) <= 0 and abs(f.calc_center_median().x) > abs(W0.x) * 0.6]
+    if near: base = sum((f.calc_center_median() for f in near), Vector()) / len(near)   # центр руки у среза (кость Tripo смещена от центра)
+    def rad(p): q = p - base; return (q - ax * q.dot(ax)).length
+    rads = sorted(rad(f.calc_center_median()) for f in near)
+    if rads:
+        med = rads[len(rads) // 2]
+        def side_on(f):        # «карточка» шерсти: нормаль почти перпендикулярна направлению от оси руки
+            q = f.calc_center_median() - base; rdir = (q - ax * q.dot(ax))
+            return rdir.length > 1e-6 and abs(f.normal.dot(rdir.normalized())) < 0.35
+        flaps = [f for f in near if rad(f.calc_center_median()) > med * 1.1 or side_on(f)]
+        bmesh.ops.delete(bm, geom=flaps, context="FACES")
+        print(f"FLAPS {P}: removed {len(flaps)} of {len(near)} faces near the cut")
 z_cut = bw("Hips").z - 0.02 * K
 bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.calc_center_median().z < z_cut], context="FACES")
 loose = [v for v in bm.verts if not v.link_faces]; bmesh.ops.delete(bm, geom=loose, context="VERTS")
@@ -150,9 +165,10 @@ rs = [((body.matrix_world @ v.co) - axis0 - axisd * ((body.matrix_world @ v.co) 
 r_wrist = wrist_r["Left_"][0]
 
 finger_specs = [  # имя, основание (в осях кисти), направление, длины фаланг, радиус
-    ("Index", (0.135, -0.047, 0.0), (1, 0, 0.09), (0.075, 0.064, 0.024), 0.034),
-    ("Middle", (0.135, 0.049, 0.0), (1, 0, 0.09), (0.079, 0.067, 0.024), 0.038),
-    ("Thumb", (0.06, -0.09, 0.018), (0.5, -0.84, 0.2), (0.062, 0.052, 0.021), 0.035),
+    # кисть компактная (−40 % от прежней), соразмерна предплечью
+    ("Index", (0.081, -0.028, 0.0), (1, 0, 0.09), (0.045, 0.038, 0.014), 0.021),
+    ("Middle", (0.081, 0.029, 0.0), (1, 0, 0.09), (0.047, 0.04, 0.014), 0.023),
+    ("Thumb", (0.036, -0.054, 0.011), (0.5, -0.84, 0.2), (0.037, 0.031, 0.013), 0.021),
 ]
 new_bones = {}   # (side, name) -> (head, tail)
 for side, P, wrist, mir in (("L", "Left_", WL, False), ("R", "Right_", WR, True)):
@@ -188,8 +204,8 @@ for side, P, wrist, mir in (("L", "Left_", WL, False), ("R", "Right_", WR, True)
     # манжета меха: от кромки среза (её центр и радиус) плавно к запястью; край среза скруглён шаром того же радиуса
     # манжета «выходит» из предплечья: начинается тоньше руки глубоко внутри, к срезу чуть шире её, дальше сужается к ладони
     part(lambda bmp, rw=rw, cen=cen: tube_world(bmp, cen - fwd * 0.12 * K, cen, rw * 0.88, rw * 1.03), True)
-    part(lambda bmp, rw=rw, cen=cen: tube_world(bmp, cen, wrist + fwd * 0.05 * K, rw * 1.03, 0.095 * K), True)
-    part(lambda bmp: ellipsoid_world(bmp, toW((0.075, 0, -0.003), wrist, mir), (0.1 * K, 0.104 * K, 0.054 * K), fr), False)  # ладонь
+    part(lambda bmp, rw=rw, cen=cen: tube_world(bmp, cen, wrist + fwd * 0.03 * K, rw * 1.03, 0.058 * K), True)
+    part(lambda bmp: ellipsoid_world(bmp, toW((0.045, 0, -0.002), wrist, mir), (0.06 * K, 0.062 * K, 0.033 * K), fr), False)  # ладонь
     for fname, base, dirv, lens, rad in finger_specs:
         for i, part_name in enumerate(("Proximal", "Intermediate")):
             h, t = new_bones[P + fname + part_name]
@@ -203,7 +219,7 @@ for side, P, wrist, mir in (("L", "Left_", WL, False), ("R", "Right_", WR, True)
     for o, _ in parts: o.select_set(True)
     bpy.context.view_layer.objects.active = parts[0][0]; bpy.ops.object.join()
     hobj = bpy.context.view_layer.objects.active; hobj.name = P + "NewHand"
-    rm = hobj.modifiers.new("r", "REMESH"); rm.mode = "VOXEL"; rm.voxel_size = 0.0035 * K; bpy.ops.object.modifier_apply(modifier="r")
+    rm = hobj.modifiers.new("r", "REMESH"); rm.mode = "VOXEL"; rm.voxel_size = 0.0026 * K; bpy.ops.object.modifier_apply(modifier="r")
     s2 = hobj.modifiers.new("s", "LAPLACIANSMOOTH"); s2.lambda_factor = 0.4; s2.iterations = 3; s2.use_volume_preserve = True; bpy.ops.object.modifier_apply(modifier="s")
     t0 = len(hobj.data.polygons)
     dm = hobj.modifiers.new("d", "DECIMATE"); dm.ratio = 800 / max(1, t0); bpy.ops.object.modifier_apply(modifier="d")

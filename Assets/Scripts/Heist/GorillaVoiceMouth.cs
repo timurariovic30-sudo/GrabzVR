@@ -44,6 +44,8 @@ public class GorillaVoiceMouth : MonoBehaviour
     [Range(0.3f, 1f)] public float openCurve = 0.6f;
     [Tooltip("Пиковая громкость микрофона в доле от средней (слоги «щёлкают» резче)")]
     [Range(0f, 1f)] public float peakMix = 0.5f;
+    [Tooltip("Насколько рот растягивается вширь при полном открытии (доля ширины)")]
+    [Range(0f, 0.5f)] public float stretch = 0.18f;
 
     [Tooltip("Тест без микрофона: рот хлопает, будто горилла болтает")]
     public bool simulateTalking;
@@ -128,8 +130,8 @@ public class GorillaVoiceMouth : MonoBehaviour
         }
         if (!mouthHole || !show) return;
         float h = Mathf.Lerp(closedHeight, openHeight, open);
-        // челюсть отвисает вниз; сильно открытый рот чуть уже — получается «О»
-        mouthHole.localScale = new Vector3(width * (1f - 0.2f * open), h, depth);
+        // челюсть отвисает вниз, рот растягивается вширь — чётко видно, что горилла говорит
+        mouthHole.localScale = new Vector3(width * (1f + stretch * open), h, depth);
         mouthHole.localPosition = new Vector3(0f, -h * 0.42f, forwardOffset - depth * sink);
     }
 }

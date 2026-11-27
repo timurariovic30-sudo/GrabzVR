@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRABZ STUDIO — офис</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand"><span class="logo">🦍</span> GRABZ STUDIO <small>Claude Code Game Studios</small></div>
+  <div class="status">
+    <div class="pill"><b>GRABZ VR</b> <span id="projStatus">загрузка…</span></div>
+    <div class="pill">Активны: <b id="activeCount">0</b> / <span id="totalCount">49</span></div>
+    <div class="pill" id="liveBadge" title="Источник событий">● <span id="liveText">нет связи</span></div>
+    <div class="pill clock" id="clock"></div>
+  </div>
+  <div class="controls">
+    <button id="viewBtn" class="btn">🗺 Обзор сверху (Tab)</button>
+    <button id="demoBtn" class="btn demo">⚡ Демо-режим (аврал)</button>
+    <button id="fitBtn" class="btn" title="Показать весь офис">⤢</button>
+  </div>
+</header>
+<main>
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <canvas id="view"></canvas>
+    <div id="crosshair"></div>
+    <div id="clickToPlay">🖱 Кликните по сцене, чтобы ходить по офису</div>
+    <div id="hint">Колесо — масштаб · ЛКМ — вращать · ПКМ — сдвиг · клик по агенту — досье</div>
+  </div>
+  <aside id="side">
+    <section class="panel">
+      <h2>💬 Чат студии</h2>
+      <ul id="chat"></ul>
+    </section>
+    <section class="panel">
+      <h2>🌿 Git <span id="branch"></span></h2>
+      <ul id="commits"></ul>
+      <h3>Изменённые файлы</h3>
+      <ul id="changed"></ul>
+    </section>
+  </aside>
+</main>
+<div id="dossier" class="hidden" role="dialog" aria-modal="true">
+  <div class="card">
+    <button class="close" id="dClose" aria-label="Закрыть">×</button>
+    <canvas id="dPortrait" width="96" height="120"></canvas>
+    <div class="info">
+      <div class="dept" id="dDept"></div>
+      <h2 id="dName"></h2>
+      <div class="role" id="dRole"></div>
+      <p class="desc" id="dDesc"></p>
+      <dl>
+        <dt>Сейчас</dt><dd id="dTask"></dd>
+        <dt>Задач выполнено</dt><dd id="dDone"></dd>
+        <dt>Модель</dt><dd id="dModel"></dd>
+      </dl>
+      <button class="btn" id="dCall">📣 Позвать к директору</button>
+      <button class="btn ghost" id="dFollow">🎥 Следить</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script src="data.js"></script>
+<script src="office3d.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
