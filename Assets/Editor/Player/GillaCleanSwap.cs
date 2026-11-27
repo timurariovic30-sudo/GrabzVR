@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -249,7 +249,7 @@ public static class GillaCleanSwap
                 var slot = GameSession.SlotOf(item.name);
                 if (slot == GameSession.CosmeticSlot.Headwear)
                 {
-                    // головной убор — на макушке новой головы, по центру, чуть меньше (балаклава закрывает голову почти до верха,
+                    // головной убор — на макушке новой головы (хохолок ~5 см торчит сквозь корону), по центру, чуть меньше (балаклава закрывает голову почти до верха,
                     // FaceMaskBuilder требует зазор корона ↔ маска ≥ 0)
                     var rs = item.GetComponentsInChildren<Renderer>(true);
                     if (rs.Length == 0) continue;
@@ -258,7 +258,7 @@ public static class GillaCleanSwap
                     float k = newHb.size.x * 0.55f / Mathf.Max(0.01f, ib.size.x);
                     item.transform.localScale *= k;
                     ib = rs[0].bounds; foreach (var r in rs) ib.Encapsulate(r.bounds);
-                    item.transform.position += new Vector3(newHb.center.x - ib.center.x, newHb.max.y + 0.002f - ib.min.y, newHb.center.z - ib.center.z);
+                    item.transform.position += new Vector3(newHb.center.x - ib.center.x, newHb.max.y - 0.05f - ib.min.y, newHb.center.z - ib.center.z);
                 }
                 else if (slot == GameSession.CosmeticSlot.Neck)
                     item.transform.position += Vector3.up * (newHb.min.y - oldHb.min.y);
@@ -308,8 +308,11 @@ public static class GillaCleanSwap
             File.WriteAllBytes($"production/qa/evidence/gilla_{name}.png", t.EncodeToPNG()); Object.DestroyImmediate(t);
             log.AppendLine($"  shot production/qa/evidence/gilla_{name}.png");
         }
-        Shot("1_front", a.position + a.forward * 2.6f + Vector3.up * 0.1f, c0);
-        Shot("2_side", a.position + a.right * 2.6f + a.forward * 0.4f + Vector3.up * 0.15f, c0);
+        // крупный план: голова + грудь
+        Vector3 bust = a.position + Vector3.down * 0.16f;
+        Shot("1_front", a.position + a.forward * 1.25f + Vector3.up * 0.05f, bust);
+        Shot("2_side", a.position + a.right * 1.25f + a.forward * 0.05f + Vector3.up * 0.05f, bust);
+        Shot("0_full", a.position + a.forward * 2.6f + Vector3.up * 0.1f, c0);
         // «в зеркале»: вид спереди на уровне глаз, отражённый по горизонтали — так игрок видит себя в зеркале Хаба
         Shot("3_mirror", a.position + a.forward * 1.3f, a.position + Vector3.down * 0.15f, true);
         // косметика: корона + балаклава вместе
