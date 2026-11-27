@@ -84,3 +84,50 @@
 - Компиляция без ошибок и предупреждений (лог `Logs/Editor.log` или batchmode).
 - Пока шлема нет, проверяем через `DesktopTestPlayer`. Сетевой кооп проверяем двумя клиентами (билд + редактор).
 - Не коммитить секреты. App ID Photon и Title ID PlayFab уже лежат в ассетах настроек.
+
+---
+
+## Студия: Claude Code Game Studios (агенты, скиллы, хуки)
+Подключён шаблон [Claude Code Game Studios](https://github.com/donchitos/claude-code-game-studios) v1.3.0 (MIT, лицензия — `.claude/LICENSE-ClaudeCodeGameStudios.txt`): 49 агентов-ролей студии, 75 скиллов-процессов и 19 хуков в `.claude/`, настройки в `project.yaml`, документы в `design/`, `docs/`, `production/`. **Правила GrabzVR выше главнее** правил студии: при расхождении действуют они (сцены, билдеры, папки, 3D-текст, сеть).
+
+### Технологии
+- **Движок**: Unity 6000.6.10f1 (URP 17.6)
+- **Язык**: C#
+- **Контроль версий**: Git, двое разработчиков, ветки `main` + личные (`bank`)
+- **Сборка**: Unity Editor / batchmode (`-executeMethod`), Quest (Android) и ПК (Link)
+- **Ассеты**: код и ассеты в `Assets/`; Tripo-модели через `TripoAssetPostprocessor`
+
+### Структура проекта
+@.claude/docs/directory-structure.md
+
+### Версия движка
+<!-- ENGINE-REFERENCE-IMPORT: the line under this comment is engine-specific,
+     and there is none until an engine is set. /setup-engine, the grow's record
+     step and /project-settings (engine.name) write
+     @docs/engine-reference/<engine>/VERSION.md here for the chosen engine. Skills
+     that need the pinned version read that file on demand either way. -->
+
+
+### Технические настройки
+`project.yaml` в корне — основное хранилище настроек студии (движок, специалисты, именование, платформа, режимы); скиллы читают его через `resolve_config` (`.claude/docs/config-resolution.md`). `.claude/docs/technical-preferences.md` — запасной вариант, читается по требованию.
+
+### Правила координации агентов
+@.claude/docs/coordination-rules.md
+
+### Протокол совместной работы
+**Решает пользователь, агенты не действуют сами.** Порядок: **Вопрос → Варианты → Решение → Черновик → Одобрение**.
+- Агенты спрашивают «Можно записать в [путь]?» перед Write/Edit (исключения: дописывание `active.md`, память агента, новый файл субагента по пути, который назвал его скилл; см. `.claude/rules/agent-memory.md`).
+- Перед одобрением агенты показывают черновик или сводку; правки в нескольких файлах — одобрение на весь набор.
+- Без указания пользователя — никаких коммитов.
+- Пропущенный или отклонённый вопрос — не ответ: ничего не делать, переспросить обычным текстом и ждать.
+- Сессия открыта не в корне репозитория? Сначала предупредить: хуки, запреты и режим «сначала спросить» грузятся, только когда Claude Code запущен здесь.
+
+Подробности и примеры — `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md`. Начало работы: `/start` (онбординг), `/setup-engine unity 6000.6` (закрепить движок), `/project-stage-detect` (разбор существующего проекта), `/next-step`.
+
+### Стандарты кода
+@.claude/docs/coding-standards.md
+
+### Управление контекстом
+`.claude/docs/context-management.md` читать по требованию. Два правила обязательны:
+- **`production/session-state/active.md` — контрольная точка сессии.** Память — файл, а не переписка. После сжатия контекста, сбоя или `/clear` читать его первым.
+- **Скрипты в `.claude/scripts/` дают наблюдения, а не вердикты.**

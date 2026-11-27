@@ -169,3 +169,10 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# === Claude Code Game Studios: скрипты хуков и данные — только LF ===
+*.sh text eol=lf
+*.awk text eol=lf
+.worktreeinclude text eol=lf
+*.tsv text eol=lf
+.claude/**/*.md text eol=lf
