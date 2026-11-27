@@ -35,6 +35,16 @@ public class GorillaVoiceMouth : MonoBehaviour
     [Tooltip("Скорость открытия и закрытия (1/с)")]
     public float attack = 30f, release = 13f;
 
+    [Header("Чёткость (поверх значений из префабов)")]
+    [Tooltip("Выдвинуть накладку вперёд перед мордочкой (м, по +Z рта), чтобы шерсть её не перекрывала")]
+    public float forwardOffset = 0.014f;
+    [Tooltip("Дополнительное усиление громкости Photon Voice")]
+    public float extraGain = 2.5f;
+    [Tooltip("Кривая раскрытия: меньше 1 — даже тихая речь заметно открывает рот")]
+    [Range(0.3f, 1f)] public float openCurve = 0.6f;
+    [Tooltip("Пиковая громкость микрофона в доле от средней (слоги «щёлкают» резче)")]
+    [Range(0f, 1f)] public float peakMix = 0.5f;
+
     [Tooltip("Тест без микрофона: рот хлопает, будто горилла болтает")]
     public bool simulateTalking;
 
@@ -55,7 +65,7 @@ public class GorillaVoiceMouth : MonoBehaviour
     void LateUpdate()
     {
         if (net && net.IsHiddenSelf) return; // своя невидимая сетевая копия — рендеры выключены сетью
-        float target = Mathf.Clamp01((ReadLevel() - noiseFloor) * gain);
+        float target = LevelToOpen(ReadLevel(), noiseFloor, gain * extraGain, openCurve);
         float speed = target > Openness ? attack : release;
         Openness = Mathf.Lerp(Openness, target, 1f - Mathf.Exp(-speed * Time.deltaTime));
         Apply(Openness);
@@ -68,7 +78,7 @@ public class GorillaVoiceMouth : MonoBehaviour
         {
             var rec = FusionNetworkManager.Instance ? FusionNetworkManager.Instance.VoiceRecorder : null;
             if (!rec || !rec.TransmitEnabled || !rec.IsCurrentlyTransmitting || rec.LevelMeter == null) return 0f;
-            return rec.LevelMeter.CurrentAvgAmp;
+            return Mathf.Lerp(rec.LevelMeter.CurrentAvgAmp, rec.LevelMeter.CurrentPeakAmp, peakMix);
         }
         if (!remoteVoice)
         {
@@ -79,6 +89,13 @@ public class GorillaVoiceMouth : MonoBehaviour
         if (!remoteVoice.isPlaying) return 0f;
         remoteVoice.GetOutputData(buffer, 0);
         return Rms(buffer);
+    }
+
+    /// Громкость → раскрытие 0…1: всё, что тише шума, — закрыт; дальше усиление и «выпуклая» кривая.
+    public static float LevelToOpen(float level, float floor, float totalGain, float curve)
+    {
+        float x = Mathf.Clamp01((level - floor) * totalGain);
+        return x <= 0f ? 0f : Mathf.Pow(x, Mathf.Max(0.05f, curve));
     }
 
     /// Среднеквадратичная громкость отсчётов.
@@ -113,6 +130,6 @@ public class GorillaVoiceMouth : MonoBehaviour
         float h = Mathf.Lerp(closedHeight, openHeight, open);
         // челюсть отвисает вниз; сильно открытый рот чуть уже — получается «О»
         mouthHole.localScale = new Vector3(width * (1f - 0.2f * open), h, depth);
-        mouthHole.localPosition = new Vector3(0f, -h * 0.42f, -depth * sink);
+        mouthHole.localPosition = new Vector3(0f, -h * 0.42f, forwardOffset - depth * sink);
     }
 }

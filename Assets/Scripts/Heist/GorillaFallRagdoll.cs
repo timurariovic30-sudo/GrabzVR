@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// Смешной нокаут при падении с высоты: горилла обмякает тряпичной куклой, звучит «бум-бонк-уа-уа»,
@@ -9,7 +11,9 @@ using UnityEngine;
 ///  • сетевая горилла: KnockoutCount вырос → у каждого клиента она падает куклой (физика своя у каждого,
 ///    это только визуал). Своя невидимая сетевая копия ничего не делает.
 /// Модель в зеркале — это своя локальная горилла, поэтому нокаут виден и там.
-/// Управление игроком не отбирается: камера и руки живут дальше, падает только модель.
+/// Свой игрок на время нокаута (knockoutDuration) теряет управление: GorillaLocomotion / DesktopTestPlayer
+/// и поворот стиком выключены, тело заморожено, камера опускается к полу рядом с куклой (с виньеткой),
+/// чтобы игрок не бегал «невидимым», пока его модель лежит. Перед вставанием всё возвращается на место.
 /// Рэгдолл собирается во время игры на костях Hips/Spine/Chest/Head/руки/ноги и после нокаута удаляется.
 /// Кости на время нокаута переносятся на слой Ignore Raycast и не сталкиваются со слоями Player и LocalHead —
 /// руки GorillaLocomotion за куклу не цепляются, своё тело её не пинает.
@@ -35,6 +39,18 @@ public class GorillaFallRagdoll : MonoBehaviour
     [Tooltip("Случайный толчок при падении (м/с) — чтобы кукла не оседала одинаково")]
     public float flopKick = 1.4f;
     public float soundVolume = 0.9f;
+
+    [Header("Нокаут своего игрока: управление и камера")]
+    [Tooltip("Отбирать управление руками / WASD на время нокаута")]
+    public bool lockLocalControls = true;
+    [Tooltip("Высота камеры над полом, пока игрок лежит (м)")]
+    public float downedCameraHeight = 0.4f;
+    [Tooltip("Насколько камера отходит назад от тела, чтобы куклу было видно (м)")]
+    public float downedCameraBack = 0.6f;
+    [Tooltip("Время опускания и подъёма камеры (с)")]
+    public float downedCameraBlend = 0.35f;
+    [Tooltip("Сила виньетки, пока игрок лежит (0 — без виньетки)")]
+    [Range(0f, 1f)] public float vignetteIntensity = 0.45f;
 
     /// Сколько раз этот игрок получил нокаут (локальный — считает сам, по сети уходит в NetworkGorillaAvatar).
     public int KnockoutCount { get; private set; }
@@ -89,6 +105,18 @@ public class GorillaFallRagdoll : MonoBehaviour
     Vector3 hipsSnapWorldPos;
     Quaternion hipsSnapWorldRot;
 
+    // нокаут своего игрока: что выключили и куда опустили камеру
+    bool localLocked;
+    float lockStart, lockEnd;
+    GorillaLocomotion.Player lockedGorilla;
+    DesktopTestPlayer lockedDesktop;
+    GorillaStickTurn lockedStick;
+    Rigidbody lockedBody;
+    bool bodyWasKinematic;
+    Transform viewOffset;
+    Vector3 viewBase, viewDelta;
+    static Volume vignetteVolume;
+
     void Awake()
     {
         if (!rig) rig = GetComponent<GorillaFinalRig>();
@@ -101,6 +129,7 @@ public class GorillaFallRagdoll : MonoBehaviour
     {
         if (rig) rig.Solved -= OnRigSolved;
         if (phase != Phase.None) EndRagdollImmediate();
+        EndLocalLock();
     }
 
     void Update()
@@ -115,6 +144,7 @@ public class GorillaFallRagdoll : MonoBehaviour
         }
         else TrackLocalFall();
 
+        if (localLocked) UpdateLocalLock();
         if (phase == Phase.Ragdoll && Time.time >= phaseUntil) BeginGetUp();
         else if (phase == Phase.GettingUp && Time.time >= phaseUntil) FinishGetUp();
     }
@@ -173,6 +203,108 @@ public class GorillaFallRagdoll : MonoBehaviour
             p.body.angularVelocity = Random.insideUnitSphere * 4f;
         }
         PlayBonk();
+        if (!net) BeginLocalLock();
+    }
+
+    // ------------------------------------------------------------------ свой игрок: без управления, камера у пола
+    void BeginLocalLock()
+    {
+        if (!lockLocalControls || localLocked) return;
+        Transform cam = null;
+        lockedGorilla = GetComponentInParent<GorillaLocomotion.Player>();
+        lockedDesktop = lockedGorilla ? null : GetComponentInParent<DesktopTestPlayer>();
+        if (lockedGorilla && lockedGorilla.headCollider)
+        {
+            cam = lockedGorilla.headCollider.transform;
+            viewOffset = lockedGorilla.transform.Find("Camera Offset");
+            if (!viewOffset || !cam.IsChildOf(viewOffset)) viewOffset = cam.parent;
+            lockedGorilla.enabled = false;                      // руки больше не толкают тело
+            lockedStick = lockedGorilla.GetComponent<GorillaStickTurn>();
+            if (lockedStick) lockedStick.enabled = false;
+            lockedBody = lockedGorilla.GetComponent<Rigidbody>();
+            if (lockedBody)
+            {
+                bodyWasKinematic = lockedBody.isKinematic;
+                if (!bodyWasKinematic) lockedBody.linearVelocity = Vector3.zero;
+                lockedBody.isKinematic = true;                  // лежит на месте, не съезжает и не падает
+            }
+        }
+        else if (lockedDesktop && lockedDesktop.cameraPivot)
+        {
+            viewOffset = cam = lockedDesktop.cameraPivot;
+            lockedDesktop.enabled = false;                      // WASD, мышь и прыжок
+        }
+        if (!cam || !viewOffset || !viewOffset.parent) { EndLocalLock(); return; }
+
+        // точка у пола рядом с телом: под головой, чуть назад от взгляда (и не в стену)
+        int mask = ~LayerMask.GetMask("Player", "LocalHead", "Ignore Raycast");
+        Vector3 floor = Physics.Raycast(cam.position, Vector3.down, out var hit, 4f, mask, QueryTriggerInteraction.Ignore)
+            ? hit.point : cam.position + Vector3.down * 1.5f;
+        Vector3 low = floor + Vector3.up * downedCameraHeight;
+        Vector3 back = -Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
+        float backDist = downedCameraBack;
+        if (back.sqrMagnitude > 0.5f && Physics.SphereCast(low, 0.12f, back, out var wall, downedCameraBack, mask, QueryTriggerInteraction.Ignore))
+            backDist = Mathf.Max(0f, wall.distance - 0.05f);
+        Vector3 target = low + back * backDist;
+
+        viewBase = viewOffset.localPosition;
+        viewDelta = viewOffset.parent.InverseTransformVector(target - cam.position);
+        lockStart = Time.time;
+        lockEnd = Time.time + knockoutDuration;
+        localLocked = true;
+    }
+
+    void UpdateLocalLock()
+    {
+        float blend = Mathf.Max(0.01f, downedCameraBlend);
+        float w = Mathf.Clamp01(Mathf.Min((Time.time - lockStart) / blend, (lockEnd - Time.time) / blend));
+        w = w * w * (3f - 2f * w);
+        if (viewOffset) viewOffset.localPosition = viewBase + viewDelta * w;
+        SetVignette(w);
+    }
+
+    /// Вернуть камеру и управление (перед вставанием, при выключении).
+    void EndLocalLock()
+    {
+        if (!localLocked) return;
+        localLocked = false;
+        if (viewOffset) viewOffset.localPosition = viewBase;
+        SetVignette(0f);
+        if (lockedBody) { lockedBody.isKinematic = bodyWasKinematic; if (!bodyWasKinematic) lockedBody.linearVelocity = Vector3.zero; }
+        if (lockedStick) lockedStick.enabled = true;
+        if (lockedGorilla)
+        {
+            // руки «переносим» к контроллерам, иначе движок посчитает рывок за время нокаута
+            lockedGorilla.leftHandFollower.position = lockedGorilla.leftHandTransform.position;
+            lockedGorilla.rightHandFollower.position = lockedGorilla.rightHandTransform.position;
+            lockedGorilla.InitializeValues();
+            lockedGorilla.enabled = true;
+        }
+        if (lockedDesktop) lockedDesktop.enabled = true;
+        hasLastHead = false;                                    // подъём камеры — не падение
+        lockedGorilla = null; lockedDesktop = null; lockedStick = null; lockedBody = null; viewOffset = null;
+    }
+
+    /// Виньетка — глобальный URP Volume (только своя камера в этой сцене, у сетевых горилл не создаётся).
+    void SetVignette(float w)
+    {
+        if (vignetteIntensity <= 0f) return;
+        if (!vignetteVolume)
+        {
+            if (w <= 0f) return;
+            var go = new GameObject("KnockoutVignette");
+            vignetteVolume = go.AddComponent<Volume>();
+            vignetteVolume.isGlobal = true;
+            vignetteVolume.priority = 200f;
+            var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            var v = profile.Add<Vignette>(true);
+            v.color.Override(Color.black);
+            v.smoothness.Override(0.55f);
+            v.intensity.Override(vignetteIntensity);
+            vignetteVolume.sharedProfile = profile;
+        }
+        vignetteVolume.weight = w;
+        vignetteVolume.enabled = w > 0.001f;
     }
 
     bool BuildRagdoll()
@@ -267,6 +399,7 @@ public class GorillaFallRagdoll : MonoBehaviour
 
     void BeginGetUp()
     {
+        EndLocalLock();                         // камера уже поднялась — риг снова идёт за ней
         // запоминаем позу «лёжа» и убираем физику
         foreach (var p in parts) { p.snapPos = p.bone.localPosition; p.snapRot = p.bone.localRotation; }
         hipsSnapWorldPos = hips.position; hipsSnapWorldRot = hips.rotation;
@@ -319,6 +452,7 @@ public class GorillaFallRagdoll : MonoBehaviour
     void EndRagdollImmediate()
     {
         Cleanup();
+        EndLocalLock();
         if (rig) rig.enabled = rigWasEnabled;
         phase = Phase.None;
     }

@@ -38856,12 +38856,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VanPortal
   sceneName: HeistLevel_Test
   countdown: 10
+  boardingCountdown: 15
   switcher: {fileID: 2005342863}
   countdownText: {fileID: 1070798063}
   engineSource: {fileID: 671958580}
   fadeMaterial: {fileID: 2100000, guid: c7442e423199f1a4f8b31daaeb588c21, type: 2}
   fadeTime: 1.5
   bus: {fileID: 1753188968}
+  doorCloseTime: 1.1
 --- !u!65 &671958579
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -57931,6 +57933,11 @@ MonoBehaviour:
   getUpDuration: 0.9
   flopKick: 1.4
   soundVolume: 0.9
+  lockLocalControls: 1
+  downedCameraHeight: 0.4
+  downedCameraBack: 0.6
+  downedCameraBlend: 0.35
+  vignetteIntensity: 0.45
 --- !u!114 &1032146323
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -58020,6 +58027,10 @@ MonoBehaviour:
   gain: 11
   attack: 30
   release: 13
+  forwardOffset: 0.014
+  extraGain: 2.5
+  openCurve: 0.6
+  peakMix: 0.5
   simulateTalking: 0
 --- !u!1 &1034129598
 GameObject:
@@ -63160,6 +63171,74 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1136411156}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1137078168
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1137078171}
+  - component: {fileID: 1137078170}
+  - component: {fileID: 1137078169}
+  m_Layer: 0
+  m_Name: HubVanSync
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1137078169
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1137078168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd80528121dd4f9438743ff07ac9cc65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HubVanSync
+  countdown: 15
+  _Departed:
+    RawValue: 0
+--- !u!114 &1137078170
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1137078168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 535692850
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 131074
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 1137078169}
+  ForceRemoteRenderTimeframe: 0
+--- !u!4 &1137078171
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1137078168}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1138908167
 GameObject:
   m_ObjectHideFlags: 0
@@ -112905,3 +112984,4 @@ SceneRoots:
   - {fileID: 827243791}
   - {fileID: 1753188970}
   - {fileID: 1202789184}
+  - {fileID: 1137078171}
