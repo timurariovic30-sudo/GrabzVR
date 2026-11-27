@@ -126,6 +126,9 @@ public static partial class BankVisualOverhaul
             ("Bank_12_vault_door", new Vector3(5.5f, -1.3f, 26.5f), new Vector3(0f, -1.8f, 30.6f)),
             ("Bank_13_basement_vault", new Vector3(8.5f, -1.2f, 31.8f), new Vector3(-4f, -2.2f, 38f)),
             ("Bank_14_garage_exit", new Vector3(3.5f, -1.4f, 27.5f), new Vector3(10f, -2f, 26.6f)),
+            ("Bank_15_bus_rear", new Vector3(0.9f, 0.8f, -7.4f), new Vector3(0f, -0.2f, -12.8f)),
+            ("Bank_16_bus_side", new Vector3(7.5f, 0.6f, -16f), new Vector3(0f, 0.2f, -13.4f)),
+            ("Bank_17_bus_inside", new Vector3(0.5f, 0.55f, -11.4f), new Vector3(0f, 0.3f, -14.6f)),
         };
         var go = new GameObject("PreviewCam");
         var cam = go.AddComponent<Camera>();

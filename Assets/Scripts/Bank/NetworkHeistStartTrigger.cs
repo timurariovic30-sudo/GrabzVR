@@ -18,6 +18,9 @@ public class NetworkHeistStartTrigger : NetworkBehaviour
     [Tooltip("Петли задних дверей: в сцене стоят открытыми, при старте поворачиваются в closedEuler")]
     public Transform[] doorHinges;
     public Vector3[] closedEuler;
+    [Tooltip("Рольставня (опускается при отъезде): масштаб по Y от свёрнутой открытой до 1; точка опоры — верх проёма")]
+    public Transform shutter;
+    public float shutterOpenScaleY = 0.04f;
     [Tooltip("Объём кузова в локальных координатах van")]
     public Vector3 cargoCenter = new Vector3(0, 1.2f, -1f);
     public Vector3 cargoSize = new Vector3(2f, 2.6f, 3.6f);
@@ -55,6 +58,7 @@ public class NetworkHeistStartTrigger : NetworkBehaviour
         Instance = this;
         // старт раунда теперь — выход из фургона, а не автостарт HeistGameManager после приезда из Хаба
         GameSession.ArrivedFromHub = false;
+        doorHinges ??= new Transform[0];
         openRot = new Quaternion[doorHinges.Length];
         for (int i = 0; i < doorHinges.Length; i++) openRot[i] = doorHinges[i].localRotation;
         segLen = new float[Mathf.Max(0, path.Length - 1)];
@@ -176,13 +180,19 @@ public class NetworkHeistStartTrigger : NetworkBehaviour
         float prev = departT;
         departT += Time.deltaTime;
 
-        // 0…0.6 с: двери захлопываются (вторая — чуть позже, со вторым ударом)
+        // 0…0.6 с: двери захлопываются (вторая — чуть позже, со вторым ударом) / рольставня опускается
         for (int i = 0; i < doorHinges.Length; i++)
         {
             float k = Mathf.Clamp01((departT - i * 0.25f) / 0.35f);
             doorHinges[i].localRotation = Quaternion.Slerp(openRot[i], Quaternion.Euler(closedEuler[i]), k * k);
         }
-        if (prev < 0.25f && departT >= 0.25f) PlaySlam();
+        if (shutter)
+        {
+            float k = Mathf.Clamp01(departT / 0.7f);
+            var sc = shutter.localScale; sc.y = Mathf.Lerp(shutterOpenScaleY, 1f, k * k); shutter.localScale = sc;
+        }
+        if (prev < 0.25f && departT >= 0.25f && doorHinges.Length > 1) PlaySlam();
+        if (prev < 0.7f && departT >= 0.7f && shutter) PlaySlam();
 
         // 0.6…1.4 с: газ на месте, дальше — разгон по маршруту
         if (engine) engine.pitch = Mathf.Lerp(1f, 1.9f, Mathf.Clamp01((departT - 0.6f) / 1.5f));
