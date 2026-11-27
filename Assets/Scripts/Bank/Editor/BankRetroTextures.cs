@@ -75,6 +75,7 @@ public static class BankRetroTextures
 
     // ------------------------------------------------------------------ мрамор
     static Color marbleA, marbleB, marbleVein;
+    static bool marbleGoldSeams;
     static float[] marbleCracks;
     /// Плиты 2×2 (по 128 px): прожилки (искривлённый синус по fbm), лёгкие тона плит, швы, тонкие трещины.
     static void Marble(int x, int y, out Color c, out float h)
@@ -93,7 +94,8 @@ public static class BankRetroTextures
         float cr = marbleCracks[y * S + x];
         if (cr > 0) { c *= 1f - 0.4f * cr; h -= 0.3f * cr; }
         int lx = x % T, ly = y % T;
-        if (lx < 2 || ly < 2) { c *= 0.62f; h = 0.15f; }                         // шов между плитами
+        if (marbleGoldSeams && (lx < 3 || ly < 3)) { c = new Color(0.86f, 0.64f, 0.24f) * (0.9f + 0.2f * n); h = 0.8f; }   // золотые полосы между плитами
+        else if (lx < 2 || ly < 2) { c *= 0.62f; h = 0.15f; }                    // шов между плитами
         c.a = 1;
     }
 
@@ -358,6 +360,99 @@ public static class BankRetroTextures
 
     // ------------------------------------------------------------------ публичное API
     public static (Texture2D, Texture2D) Pavement() => Make("Pavement", 256, Pavement, 2f);
+    /// Светлый полированный мрамор Майами (кремовый) с золотыми полосами по швам плит.
+    public static (Texture2D, Texture2D) MarbleGold()
+    {
+        marbleA = new Color(0.93f, 0.88f, 0.82f); marbleB = new Color(0.99f, 0.96f, 0.92f); marbleVein = new Color(0.78f, 0.66f, 0.62f);
+        marbleCracks = Cracks(256, 1, 30, 60, 331);
+        marbleGoldSeams = true;
+        var r = Make("MarbleGold", 256, Marble, 1.6f);
+        marbleGoldSeams = false;
+        return r;
+    }
+    /// Бирюзовый мрамор с белыми прожилками (цоколи, колонны, карнизы в стиле Ар-деко).
+    public static (Texture2D, Texture2D) MarbleTeal()
+    {
+        marbleA = new Color(0.16f, 0.52f, 0.52f); marbleB = new Color(0.26f, 0.66f, 0.64f); marbleVein = new Color(0.92f, 0.95f, 0.93f);
+        marbleCracks = Cracks(256, 1, 30, 60, 337);
+        return Make("MarbleTeal", 256, Marble, 1.6f);
+    }
+
+    // ------------------------------------------------------------------ закатное стекло
+    /// Панорамное окно на закат Майами: градиент малиновый → оранжевый → золотой, ретро-солнце с полосами,
+    /// тёмно-фиолетовые силуэты пальм и линия моря. Для неосвещённого (Unlit) материала окон.
+    static void SunsetGlass(int x, int y, out Color c, out float h)
+    {
+        const int S = 128;
+        float u = x / (float)S, v = y / (float)S;
+        var top = new Color(0.55f, 0.25f, 0.62f); var mid = new Color(1f, 0.38f, 0.55f); var low = new Color(1f, 0.66f, 0.32f);
+        c = v > 0.55f ? Color.Lerp(mid, top, (v - 0.55f) / 0.45f) : Color.Lerp(low, mid, Mathf.Clamp01((v - 0.25f) / 0.3f));
+        // солнце с прорезями
+        float dx = u - 0.5f, dy = v - 0.38f, d = Mathf.Sqrt(dx * dx + dy * dy);
+        if (d < 0.2f && v > 0.25f && !(v < 0.36f && (int)(v * 60) % 2 == 0)) c = Color.Lerp(new Color(1f, 0.9f, 0.45f), new Color(1f, 0.45f, 0.5f), (0.38f + 0.2f - v) / 0.4f);
+        // море
+        if (v < 0.25f) c = Color.Lerp(new Color(0.12f, 0.35f, 0.55f), new Color(0.95f, 0.55f, 0.45f), Mathf.Clamp01(Mathf.Sin(u * 40f + v * 90f) * 0.5f + 0.5f) * (v / 0.25f) * 0.6f);
+        // пальмы: два ствола и кроны-веера
+        var palm = new Color(0.2f, 0.08f, 0.25f);
+        foreach (var (px, lean) in new[] { (0.16f, 0.12f), (0.86f, -0.1f) })
+        {
+            float trunkX = px + lean * (v - 0.2f);
+            if (v > 0.15f && v < 0.72f && Mathf.Abs(u - trunkX) < 0.018f + 0.01f * (0.72f - v)) c = palm;
+            float cx = px + lean * 0.52f, cy = 0.74f;
+            float fx = u - cx, fy = v - cy, r = Mathf.Sqrt(fx * fx + fy * fy);
+            float ang = Mathf.Atan2(fy, fx);
+            float frond = Mathf.Abs(Mathf.Sin(ang * 3.5f));
+            if (r < 0.2f && frond > 0.75f - r * 1.5f && fy > -0.12f) c = palm;
+        }
+        h = 0.5f;
+        c.a = 1;
+    }
+    public static (Texture2D, Texture2D) Sunset() => Make("SunsetGlass", 128, SunsetGlass, 0.5f);
+
+    /// Панорама неба заката Майами (широта-долгота 1024×512) для Skybox/Panoramic: индиго → фиолетовый → розовый →
+    /// золотой у горизонта, ретро-полосы облаков, тёплая дымка ниже горизонта.
+    public static Texture2D SunsetPanorama()
+    {
+        const int W = 1024, H = 512;
+        var cols = new Color[W * H];
+        var top = new Color(0.16f, 0.1f, 0.36f); var purple = new Color(0.5f, 0.26f, 0.66f);
+        var pink = new Color(1f, 0.45f, 0.62f); var gold = new Color(1f, 0.7f, 0.36f); var ground = new Color(0.45f, 0.26f, 0.34f);
+        for (int y = 0; y < H; y++)
+        {
+            float e = (y / (float)(H - 1) - 0.5f) * 180f;                       // высота над горизонтом, градусы
+            Color c;
+            if (e < 0) c = Color.Lerp(gold * 0.9f, ground, Mathf.Clamp01(-e / 12f));
+            else if (e < 6) c = Color.Lerp(gold, pink, e / 6f);
+            else if (e < 28) c = Color.Lerp(pink, purple, (e - 6f) / 22f);
+            else c = Color.Lerp(purple, top, Mathf.Clamp01((e - 28f) / 50f));
+            for (int x = 0; x < W; x++)
+            {
+                float u = x / (float)W;
+                var p = c;
+                // ретро-облака: тонкие светлые полосы на 10–22° с волнистыми краями
+                foreach (var (ce, w, k) in new[] { (11f, 1.2f, 0.35f), (16f, 0.8f, 0.25f), (21f, 0.6f, 0.2f) })
+                {
+                    float wave = Mathf.Sin(u * Mathf.PI * 2 * 6 + ce) * 0.8f + Mathf.Sin(u * Mathf.PI * 2 * 15) * 0.3f;
+                    float d = Mathf.Abs(e - ce - wave);
+                    if (d < w) p = Color.Lerp(p, new Color(1f, 0.75f, 0.8f), k * (1f - d / w));
+                }
+                cols[y * W + x] = p;
+            }
+        }
+        MapKit.EnsureFolder(Dir);
+        string path = $"{Dir}/T_Bank_SunsetSky.png";
+        var t = new Texture2D(W, H, TextureFormat.RGBA32, false);
+        t.SetPixels(cols); t.Apply();
+        File.WriteAllBytes(path, t.EncodeToPNG());
+        Object.DestroyImmediate(t);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        var ti = (TextureImporter)AssetImporter.GetAtPath(path);
+        ti.maxTextureSize = 1024; ti.mipmapEnabled = false; ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp;
+        ti.filterMode = FilterMode.Bilinear; ti.textureCompression = TextureImporterCompression.Compressed;
+        ti.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+    }
+
     public static (Texture2D, Texture2D) MarbleLight()
     {
         marbleA = new Color(0.86f, 0.84f, 0.80f); marbleB = new Color(0.95f, 0.94f, 0.91f); marbleVein = new Color(0.45f, 0.44f, 0.46f);

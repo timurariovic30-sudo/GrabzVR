@@ -27,8 +27,7 @@ public static partial class BankVisualOverhaul
         ReplaceSofasWithBenches(g, map);
         ReplacePlants(g, map);
         ReplaceOfficeDesks(g, map);
-        BuildTellerRow(g);
-        BuildVaultDoor(root, map);
+        // ряд касс, решётки и дверь хранилища теперь строит BankServiceWing (кассы Майами + подземное хранилище)
     }
 
     static IEnumerable<Transform> Named(Transform map, string zone, string name)
@@ -101,14 +100,10 @@ public static partial class BankVisualOverhaul
     static void ReplaceSofasWithBenches(Transform g, Transform map)
     {
         if (!Prefab("Bank_LeatherBench")) return;
-        foreach (var sofa in Named(map, "Z2_MainHall", "Sofa"))
-        {
-            HideQuiet(sofa);
-            Place(g, "Bank_LeatherBench", new Vector3(sofa.position.x, 0, sofa.position.z), sofa.eulerAngles.y, 0, 2.6f);
-        }
-        // ещё пара скамей ближе ко входу
-        Place(g, "Bank_LeatherBench", new Vector3(-3.6f, 0, 9.5f), 90f, 0, 2.6f);
-        Place(g, "Bank_LeatherBench", new Vector3(3.6f, 0, 9.5f), -90f, 0, 2.6f);
+        foreach (var sofa in Named(map, "Z2_MainHall", "Sofa")) HideQuiet(sofa);
+        // скамьи для клиентов между колоннами (у касс места нет — там очередь)
+        foreach (var (x, z, yaw) in new[] { (-3.6f, 10.5f, 90f), (3.6f, 10.5f, -90f), (-3.6f, 6.5f, 90f), (3.6f, 6.5f, -90f) })
+            Place(g, "Bank_LeatherBench", new Vector3(x, 0, z), yaw, 0, 2.6f);
     }
 
     static void ReplacePlants(Transform g, Transform map)

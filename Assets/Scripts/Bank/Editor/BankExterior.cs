@@ -22,12 +22,53 @@ public static partial class BankVisualOverhaul
     const string UiDir = "Assets/Audio/Kenney_InterfaceSounds";
 
     static Material pavement, brick, windowWarm, windowCool, windowDark, vanPaint, vanGlass, headlightMat, tailMat, rubber, chromeMat,
-                    paintWhite, lampBulb, neonGold, neonPink, neonCyan, nightSky;
+                    paintWhite, lampBulb, neonGold, neonPink, neonCyan, nightSky,
+                    stuccoWhite, stuccoPink, stuccoTeal, stuccoMint, stuccoPeach, marbleGold, marbleTeal, sunsetGlass, sunsetGlassUnlit,
+                    neonSun, lightShaft, serviceWall, breakTile, sunsetSky;
 
     static void BuildExteriorMaterials()
     {
         var (pB, pN) = BankRetroTextures.Pavement();
-        pavement = Lit("Pavement", pB, pN, Color.white, 2f);
+        pavement = Lit("Pavement", pB, pN, new Color(1f, 0.9f, 0.86f), 2f);      // тёплая плитка Майами
+        // Майами: штукатурка Ар-деко пастельных цветов, мрамор с золотом, закатное стекло
+        var pl = (Texture2D)plaster.GetTexture("_BaseMap"); var pln = (Texture2D)plaster.GetTexture("_BumpMap");
+        stuccoWhite = Lit("StuccoWhite", pl, pln, new Color(1.12f, 1.1f, 1.06f), 2.5f);
+        stuccoPink = Lit("StuccoPink", pl, pln, new Color(1.15f, 0.78f, 0.84f), 2.5f);
+        stuccoTeal = Lit("StuccoTeal", pl, pln, new Color(0.55f, 0.95f, 0.95f), 2.5f);
+        stuccoMint = Lit("StuccoMint", pl, pln, new Color(0.75f, 1.08f, 0.88f), 2.5f);
+        stuccoPeach = Lit("StuccoPeach", pl, pln, new Color(1.16f, 0.9f, 0.7f), 2.5f);
+        serviceWall = Lit("ServiceWall", pl, pln, new Color(0.88f, 1.0f, 0.95f), 2.5f);
+        var (mgB, mgN) = BankRetroTextures.MarbleGold();
+        marbleGold = Lit("MarbleGold", mgB, mgN, Color.white, 1.6f);
+        var (mtB, mtN) = BankRetroTextures.MarbleTeal();
+        marbleTeal = Lit("MarbleTeal", mtB, mtN, Color.white, 1.4f);
+        breakTile = Lit("BreakTile", (Texture2D)tread.GetTexture("_BaseMap"), (Texture2D)tread.GetTexture("_BumpMap"), new Color(1.1f, 0.85f, 0.8f), 1.0f);
+        var (sgB, _) = BankRetroTextures.Sunset();
+        sunsetGlass = GetMat("SunsetGlass", "Universal Render Pipeline/Lit");
+        sunsetGlass.SetTexture("_BaseMap", sgB); sunsetGlass.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.95f));
+        TripoAssetPostprocessor.MakeMatte(sunsetGlass);
+        sunsetGlass.EnableKeyword("_EMISSION"); sunsetGlass.SetTexture("_EmissionMap", sgB); sunsetGlass.SetColor("_EmissionColor", Color.white * 0.45f);
+        EditorUtility.SetDirty(sunsetGlass);
+        sunsetGlassUnlit = GetMat("SunsetGlassUnlit", "Universal Render Pipeline/Unlit");
+        sunsetGlassUnlit.SetTexture("_BaseMap", sgB); sunsetGlassUnlit.SetColor("_BaseColor", new Color(1.25f, 1.15f, 1.1f));
+        EditorUtility.SetDirty(sunsetGlassUnlit);
+        neonSun = Emissive("NeonSun", new Color(1f, 0.45f, 0.35f), 3.2f);
+        lightShaft = GetMat("LightShaft", "Universal Render Pipeline/Unlit");     // аддитивные лучи заката из окон
+        lightShaft.SetColor("_BaseColor", new Color(0.09f, 0.05f, 0.045f, 1f));
+        lightShaft.SetFloat("_Surface", 1f); lightShaft.SetFloat("_Blend", 2f);
+        lightShaft.SetFloat("_SrcBlend", (float)BlendMode.One); lightShaft.SetFloat("_DstBlend", (float)BlendMode.One);
+        lightShaft.SetFloat("_SrcBlendAlpha", (float)BlendMode.One); lightShaft.SetFloat("_DstBlendAlpha", (float)BlendMode.One);
+        lightShaft.SetFloat("_ZWrite", 0f); lightShaft.SetFloat("_Cull", (float)CullMode.Off);
+        lightShaft.SetOverrideTag("RenderType", "Transparent"); lightShaft.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        lightShaft.renderQueue = (int)RenderQueue.Transparent;
+        EditorUtility.SetDirty(lightShaft);
+        sunsetSky = GetMat("SunsetSky", "Skybox/Panoramic");                   // закат Майами: своя панорама-градиент
+        sunsetSky.SetTexture("_MainTex", BankRetroTextures.SunsetPanorama());
+        sunsetSky.SetFloat("_Mapping", 1f); sunsetSky.EnableKeyword("_MAPPING_LATITUDE_LONGITUDE_LAYOUT"); sunsetSky.DisableKeyword("_MAPPING_6_FRAMES_LAYOUT");
+        sunsetSky.SetFloat("_ImageType", 0f);
+        sunsetSky.SetColor("_Tint", new Color(0.5f, 0.5f, 0.5f));
+        sunsetSky.SetFloat("_Exposure", 1.0f);
+        EditorUtility.SetDirty(sunsetSky);
         var hb = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/Textures/Hub/T_Hub_Brick.png");
         var hn = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/Textures/Hub/T_Hub_Brick_N.png");
         brick = Lit("BrickNight", hb, hn, new Color(0.72f, 0.66f, 0.64f), 1.6f);
@@ -45,6 +86,7 @@ public static partial class BankVisualOverhaul
         neonGold = TmpNeon("NeonGold", new Color(1f, 0.7f, 0.2f) * 3.2f);
         neonPink = TmpNeon("NeonPink", new Color(1f, 0.2f, 0.6f) * 3f);
         neonCyan = TmpNeon("NeonCyan", new Color(0.2f, 0.9f, 1f) * 3f);
+        neonCyanMesh = Emissive("NeonCyanTube", new Color(0.2f, 0.95f, 1f), 3.2f);
 
         nightSky = GetMat("NightSky", "Skybox/Procedural");
         nightSky.SetFloat("_SunDisk", 0f);
@@ -122,21 +164,22 @@ public static partial class BankVisualOverhaul
         foreach (var sb in Object.FindObjectsByType<Scoreboard>(FindObjectsInactive.Include))
         { sb.lobbyHint = "ВЫЙДИ ИЗ ФУРГОНА — СТАРТ!"; EditorUtility.SetDirty(sb); }
 
-        // ночь: небо, лунный свет, туман
-        RenderSettings.skybox = nightSky;
+        // закат Майами: розово-фиолетовое небо, низкое тёплое солнце с юго-запада (светит на фасад), тёплый туман
+        RenderSettings.skybox = sunsetSky;
         RenderSettings.ambientMode = AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.22f, 0.25f, 0.34f);
-        RenderSettings.ambientEquatorColor = new Color(0.15f, 0.15f, 0.18f);
-        RenderSettings.ambientGroundColor = new Color(0.06f, 0.06f, 0.07f);
+        RenderSettings.ambientSkyColor = new Color(0.72f, 0.58f, 0.74f);
+        RenderSettings.ambientEquatorColor = new Color(0.68f, 0.52f, 0.5f);
+        RenderSettings.ambientGroundColor = new Color(0.26f, 0.18f, 0.2f);
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.ExponentialSquared;
-        RenderSettings.fogDensity = 0.012f;
-        RenderSettings.fogColor = new Color(0.05f, 0.06f, 0.1f);
+        RenderSettings.fogDensity = 0.01f;
+        RenderSettings.fogColor = new Color(0.92f, 0.62f, 0.66f);
         var sun = scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Light>(true)).FirstOrDefault(l => l.type == LightType.Directional);
         if (sun)
         {
-            sun.color = new Color(0.55f, 0.63f, 0.95f); sun.intensity = 0.3f; sun.shadows = LightShadows.None;
-            sun.transform.rotation = Quaternion.Euler(38f, -25f, 0f);
+            sun.color = new Color(1f, 0.82f, 0.7f); sun.intensity = 1.0f; sun.shadows = LightShadows.None;
+            sun.transform.rotation = Quaternion.Euler(12f, 28f, 0f);
+            RenderSettings.sun = sun;
             EditorUtility.SetDirty(sun); EditorUtility.SetDirty(sun.transform);
         }
         log.AppendLine("  exterior: street, facade, city blocks, arrival van, night sky");
@@ -156,52 +199,57 @@ public static partial class BankVisualOverhaul
     {
         var f = Group(ex, "Facade");
         const float z = -0.155f, T = 0.01f;
-        Panel(f, "Facade_Offices", false, z, -34, -14, 0, 9.2f, T, limestone);
-        Panel(f, "Facade_Hall", false, z, -14, 14, 0, 10.2f, T, limestone, (-1.5f, 1.5f, 0f, 3f));
-        Panel(f, "Facade_Gallery", false, z, 14, 34, 0, 6.2f, T, limestone);
-        Box(f, "Plinth", new Vector3(0, -0.45f, -0.3f), new Vector3(68.4f, 0.9f, 0.3f), marbleDark, true);
-        Box(f, "Cornice_Hall", new Vector3(0, 10.4f, -0.35f), new Vector3(28.4f, 0.4f, 0.5f), marbleDark, true);
-        Box(f, "Cornice_Offices", new Vector3(-24, 9.35f, -0.3f), new Vector3(20.2f, 0.3f, 0.4f), marbleDark, true);
-        Box(f, "Cornice_Gallery", new Vector3(24, 6.35f, -0.3f), new Vector3(20.2f, 0.3f, 0.4f), marbleDark, true);
-        Box(f, "Band_Offices", new Vector3(-24, 4.4f, -0.22f), new Vector3(20f, 0.2f, 0.14f), marbleDark, true);
+        Panel(f, "Facade_Offices", false, z, -34, -14, 0, 9.2f, T, stuccoPink);
+        Panel(f, "Facade_Hall", false, z, -14, 14, 0, 10.2f, T, stuccoWhite, (-1.5f, 1.5f, 0f, 3f));
+        Panel(f, "Facade_Gallery", false, z, 14, 34, 0, 6.2f, T, stuccoMint);
+        Box(f, "Plinth", new Vector3(0, -0.45f, -0.3f), new Vector3(68.4f, 0.9f, 0.3f), marbleTeal, true);
+        Box(f, "Cornice_Hall", new Vector3(0, 10.4f, -0.35f), new Vector3(28.4f, 0.4f, 0.5f), stuccoTeal, true);
+        Box(f, "Cornice_Offices", new Vector3(-24, 9.35f, -0.3f), new Vector3(20.2f, 0.3f, 0.4f), stuccoWhite, true);
+        Box(f, "Cornice_Gallery", new Vector3(24, 6.35f, -0.3f), new Vector3(20.2f, 0.3f, 0.4f), stuccoWhite, true);
+        Box(f, "Band_Offices", new Vector3(-24, 4.4f, -0.22f), new Vector3(20f, 0.2f, 0.14f), stuccoWhite, true);
+        // золотые вертикальные рёбра Ар-деко на углах секций фасада
+        foreach (float x in new[] { -33.4f, -14.6f, 14.6f, 33.4f })
+            Box(f, "DecoFin", new Vector3(x, 4.6f, -0.3f), new Vector3(0.3f, 9.2f, 0.3f), brass, true);
 
         // окна: офисы (2 ряда), галерея, высокие окна Холла за колоннами
         int k = 0;
-        Material Pane() { k++; return (k * 7 % 5) switch { 0 => windowDark, 1 => windowCool, _ => windowWarm }; }
+        Material Pane() { k++; return sunsetGlass; }
         foreach (float x in new[] { -31f, -27f, -23f, -19f })
         {
             FacadeWindow(f, x, 1.2f, 1.6f, 2.2f, Pane());
             FacadeWindow(f, x, 5.4f, 1.6f, 2.2f, Pane());
         }
-        foreach (float x in new[] { 17.5f, 21.5f, 25.5f, 29.5f }) FacadeWindow(f, x, 1.4f, 1.8f, 2.6f, windowCool);
-        foreach (float x in new[] { -9.4f, -5.3f, 5.3f, 9.4f }) FacadeWindow(f, x, 4.2f, 1.5f, 3.6f, windowWarm);
-        Box(f, "Transom", new Vector3(0, 3.45f, -0.17f), new Vector3(3f, 0.7f, 0.02f), windowWarm);
+        foreach (float x in new[] { 17.5f, 21.5f, 25.5f, 29.5f }) FacadeWindow(f, x, 1.4f, 1.8f, 2.6f, sunsetGlass);
+        foreach (float x in new[] { -9.4f, -5.3f, 5.3f, 9.4f }) FacadeWindow(f, x, 4.0f, 1.8f, 4.0f, sunsetGlass);   // панорамные окна Холла
+        Box(f, "Transom", new Vector3(0, 3.45f, -0.17f), new Vector3(3f, 0.7f, 0.02f), sunsetGlass);
 
         // портик: площадка, 5 ступеней, 6 колонн с кольцами-зацепами, антаблемент, аттик
-        Box(f, "Portico", new Vector3(0, -0.45f, -2.2f), new Vector3(26f, 0.9f, 4.1f), marble, true);
+        Box(f, "Portico", new Vector3(0, -0.45f, -2.2f), new Vector3(26f, 0.9f, 4.1f), marbleGold, true);
         for (int i = 0; i < 5; i++)
         {
             float top = -0.15f * (i + 1), z0 = -4.25f - 0.5f * (i + 1);
-            Box(f, "Step", new Vector3(0, (top + SidewalkY) / 2, z0 + 0.25f), new Vector3(26f + 0.4f * (i + 1), top - SidewalkY, 0.5f), marble, true);
+            Box(f, "Step", new Vector3(0, (top + SidewalkY) / 2, z0 + 0.25f), new Vector3(26f + 0.4f * (i + 1), top - SidewalkY, 0.5f), stuccoWhite, true);
         }
         foreach (float x in new[] { -11.6f, -7.4f, -3.2f, 3.2f, 7.4f, 11.6f })
         {
             var c = new Vector3(x, 0, -2.6f);
-            Cyl(f, "ColumnBase", c + Vector3.up * 0.2f, 0.75f, 0.4f, marbleDark, true);
-            Cyl(f, "ColumnShaft", c + Vector3.up * 4.9f, 0.48f, 9.0f, marble, true);
-            Box(f, "ColumnCapital", c + Vector3.up * 9.65f, new Vector3(1.3f, 0.5f, 1.3f), marbleDark, true);
+            Cyl(f, "ColumnBase", c + Vector3.up * 0.2f, 0.75f, 0.4f, marbleTeal, true);
+            Cyl(f, "ColumnShaft", c + Vector3.up * 4.9f, 0.48f, 9.0f, stuccoWhite, true);
+            Box(f, "ColumnCapital", c + Vector3.up * 9.65f, new Vector3(1.3f, 0.5f, 1.3f), brass, true);
             foreach (float y in new[] { 2.6f, 5.0f, 7.4f }) Cyl(f, "ColumnRing", c + Vector3.up * y, 0.56f, 0.12f, brass, true);
         }
-        Box(f, "Entablature", new Vector3(0, 10.25f, -1.8f), new Vector3(26.4f, 0.7f, 3.3f), limestone, true);
-        Box(f, "Attic", new Vector3(0, 10.95f, -1.6f), new Vector3(24f, 0.7f, 2.9f), limestone, true);
-        Box(f, "Pediment", new Vector3(0, 11.6f, -1.4f), new Vector3(12f, 0.6f, 2.4f), limestone, true);
+        Box(f, "Entablature", new Vector3(0, 10.25f, -1.8f), new Vector3(26.4f, 0.7f, 3.3f), stuccoWhite, true);
+        Box(f, "EntablatureStripe", new Vector3(0, 9.95f, -3.46f), new Vector3(26.4f, 0.1f, 0.02f), stuccoTeal);
+        Box(f, "Attic", new Vector3(0, 10.95f, -1.6f), new Vector3(24f, 0.7f, 2.9f), stuccoPink, true);
+        Box(f, "Pediment", new Vector3(0, 11.6f, -1.4f), new Vector3(12f, 0.6f, 2.4f), stuccoWhite, true);
 
-        // вывеска GRABZ BANK — золотой неон (3D TextMeshPro, не Canvas)
-        Box(f, "SignBoard", new Vector3(0, 10.25f, -3.47f), new Vector3(11.5f, 0.62f, 0.02f), windowDark);
-        var sign = Label(f, "Sign_GRABZ_BANK", "GRABZ BANK", 6.5f, Color.white, new Vector3(0, 10.25f, -3.49f), Vector3.back, new Vector2(11.5f, 0.8f));
-        sign.fontSharedMaterial = neonGold; sign.characterSpacing = 18f;
-        var sub = Label(f, "Sign_Since", "СБЕРЕГАТЕЛЬНЫЙ БАНК · С 1923 ГОДА", 1.6f, new Color(0.85f, 0.8f, 0.65f), new Vector3(0, 10.95f, -3.07f), Vector3.back, new Vector2(10f, 0.3f));
-        sub.fontStyle = FontStyles.Normal;
+        // неоновая вывеска SUNSET TRUST BANK (3D TextMeshPro + HDR-материал → Bloom) и логотип: ретро-солнце с пальмой
+        Box(f, "SignBoard", new Vector3(0, 10.25f, -3.47f), new Vector3(13f, 0.62f, 0.02f), windowDark);
+        var sign = Label(f, "Sign_SunsetTrust", "SUNSET TRUST BANK", 5.2f, Color.white, new Vector3(0, 10.25f, -3.49f), Vector3.back, new Vector2(13f, 0.8f));
+        sign.fontSharedMaterial = neonPink; sign.characterSpacing = 10f;
+        var sub = Label(f, "Sign_Since", "MIAMI · EST. 1923", 1.8f, Color.white, new Vector3(0, 10.95f, -3.07f), Vector3.back, new Vector2(10f, 0.3f));
+        sub.fontSharedMaterial = neonCyan;
+        Logo(f, new Vector3(0, 12.75f, -2.62f), 1.0f);
         var enter = Label(f, "Sign_Enter", "ВХОД", 2.2f, Color.white, new Vector3(0, 3.45f, -0.2f), Vector3.back, new Vector2(2.5f, 0.4f));
         enter.fontSharedMaterial = neonCyan;
 
@@ -212,6 +260,27 @@ public static partial class BankVisualOverhaul
             Box(f, "DoorHandle", new Vector3(sx * 1.65f, 1.2f, -0.28f), new Vector3(0.05f, 0.5f, 0.05f), brass);
         }
     }
+
+    /// Логотип банка из примитивов: ретро-солнце (диск с тёмными прорезями) и бирюзовая неоновая пальма. Лицом к −Z.
+    static void Logo(Transform p, Vector3 c, float r)
+    {
+        var g = Group(p, "SunsetLogo");
+        Cyl(g, "Sun", c, r, 0.06f, neonSun, false, Quaternion.Euler(90, 0, 0));
+        for (int i = 0; i < 3; i++)
+            Box(g, "SunStripe", c + new Vector3(0, -r * (0.25f + 0.22f * i), -0.04f), new Vector3(r * 2.1f, r * 0.07f * (i + 1), 0.02f), windowDark);
+        var trunkBase = c + new Vector3(r * 0.45f, -r * 1.05f, -0.08f);
+        var top = trunkBase + new Vector3(-r * 0.25f, r * 1.75f, 0);
+        var mid = (trunkBase + top) / 2 + new Vector3(r * 0.12f, 0, 0);
+        foreach (var (a, b) in new[] { (trunkBase, mid), (mid, top) })
+            Box(g, "PalmTrunk", (a + b) / 2, new Vector3(r * 0.09f, (b - a).magnitude, 0.03f), neonCyanMesh, false, Quaternion.FromToRotation(Vector3.up, (b - a).normalized));
+        foreach (float ang in new[] { -150f, -110f, -60f, -20f, 20f, 60f })
+        {
+            var dir = Quaternion.Euler(0, 0, ang) * Vector3.right;
+            Box(g, "PalmFrond", top + dir * r * 0.4f, new Vector3(r * 0.8f, r * 0.08f, 0.03f), neonCyanMesh, false, Quaternion.Euler(0, 0, ang));
+        }
+    }
+
+    static Material neonCyanMesh;
 
     // =========================================================================== улица
     static void BuildStreet(Transform ex)
@@ -239,22 +308,26 @@ public static partial class BankVisualOverhaul
 
     // =========================================================================== дома вокруг
     /// Кирпичный дом: коробка от тротуара вверх + сетка окон на фасаде, обращённом к улице (normalZ = ±1).
-    static void Building(Transform p, string name, float x0, float x1, float z0, float z1, float h, float normalZ, int seed, string neon = null, Material neonMat = null)
+    /// Отель / дом в стиле Ар-деко Майами: пастельная штукатурка, белые «брови» над рядами окон, золотое ребро по центру,
+    /// закатное стекло в окнах и неоновая вывеска над первым этажом (normalZ = ±1 — фасад к улице).
+    static void Building(Transform p, string name, float x0, float x1, float z0, float z1, float h, float normalZ, int seed, string neon = null, Material neonMat = null, Material wall = null)
     {
         var g = Group(p, name);
-        Box(g, "Block", new Vector3((x0 + x1) / 2, SidewalkY + h / 2, (z0 + z1) / 2), new Vector3(x1 - x0, h, z1 - z0), brick, true);
-        Box(g, "Roof", new Vector3((x0 + x1) / 2, SidewalkY + h + 0.15f, (z0 + z1) / 2), new Vector3(x1 - x0 + 0.3f, 0.3f, z1 - z0 + 0.3f), concreteCeil, true);
+        wall ??= stuccoWhite;
+        Box(g, "Block", new Vector3((x0 + x1) / 2, SidewalkY + h / 2, (z0 + z1) / 2), new Vector3(x1 - x0, h, z1 - z0), wall, true);
+        Box(g, "Roof", new Vector3((x0 + x1) / 2, SidewalkY + h + 0.2f, (z0 + z1) / 2), new Vector3(x1 - x0 + 0.4f, 0.4f, z1 - z0 + 0.4f), stuccoWhite, true);
+        Box(g, "RoofTier", new Vector3((x0 + x1) / 2, SidewalkY + h + 0.9f, (z0 + z1) / 2), new Vector3((x1 - x0) * 0.4f, 1.0f, (z1 - z0) * 0.6f), wall, true);
         if (normalZ == 0) return;
         float fz = (normalZ > 0 ? z1 : z0) + normalZ * 0.02f;
-        int i = 0;
+        Box(g, "DecoFin", new Vector3((x0 + x1) / 2, SidewalkY + h / 2 + 1.5f, fz + normalZ * 0.2f), new Vector3(0.5f, h - 3f, 0.4f), brass, true);
+        for (float y = SidewalkY + 1.4f; y < SidewalkY + h - 1.8f; y += 3.2f)
+            if (y > SidewalkY + 2f) Box(g, "Eyebrow", new Vector3((x0 + x1) / 2, y + 1.65f, fz + normalZ * 0.25f), new Vector3(x1 - x0 - 0.6f, 0.12f, 0.5f), stuccoWhite, true);
         for (float x = x0 + 1.6f; x < x1 - 1.2f; x += 3f)
             for (float y = SidewalkY + 1.4f; y < SidewalkY + h - 1.8f; y += 3.2f)
             {
-                i++;
-                float r = Mathf.Abs(Mathf.Sin((i + seed) * 12.9898f) * 43758.5f) % 1f;
-                var m = r < 0.42f ? windowWarm : r < 0.55f ? windowCool : windowDark;
+                if (Mathf.Abs(x - (x0 + x1) / 2) < 0.8f) continue;               // место под золотое ребро
                 bool shop = y < SidewalkY + 2f;
-                Box(g, shop ? "ShopWindow" : "Window", new Vector3(x, y + (shop ? 0.9f : 0.75f), fz), new Vector3(shop ? 2.2f : 1.1f, shop ? 1.8f : 1.5f, 0.02f), shop && r < 0.8f ? windowWarm : m);
+                Box(g, shop ? "ShopWindow" : "Window", new Vector3(x, y + (shop ? 0.9f : 0.75f), fz), new Vector3(shop ? 2.2f : 1.1f, shop ? 1.8f : 1.5f, 0.02f), shop ? windowWarm : sunsetGlass);
             }
         if (neon != null)
         {
@@ -267,17 +340,17 @@ public static partial class BankVisualOverhaul
     {
         var c = Group(ex, "CityBlocks");
         // по сторонам от Банка (закрывают его боковые стены)
-        Building(c, "Bldg_W", -52f, -34.3f, -0.45f, 14f, 13f, -1, 3);
-        Building(c, "Bldg_E", 34.3f, 52f, -0.45f, 14f, 11f, -1, 7, "ЛОМБАРД", neonPink);
+        Building(c, "Bldg_W", -52f, -34.3f, -0.45f, 14f, 13f, -1, 3, "PALM CAFE", neonCyan, stuccoPeach);
+        Building(c, "Bldg_E", 34.3f, 52f, -0.45f, 14f, 11f, -1, 7, "FLAMINGO", neonPink, stuccoTeal);
         // напротив, через дорогу
-        Building(c, "Bldg_S1", -52f, -28f, -36f, -24.2f, 12f, 1, 11, "КАФЕ 24", neonCyan);
-        Building(c, "Bldg_S2", -28f, -6f, -36f, -24.2f, 9f, 1, 13);
-        Building(c, "Bldg_S3", -6f, 16f, -36f, -24.2f, 14f, 1, 17, "ОТЕЛЬ «ЗАКАТ»", neonPink);
-        Building(c, "Bldg_S4", 16f, 37f, -36f, -24.2f, 10f, 1, 19);
+        Building(c, "Bldg_S1", -52f, -28f, -36f, -24.2f, 12f, 1, 11, "OCEAN HOTEL", neonCyan, stuccoPink);
+        Building(c, "Bldg_S2", -28f, -6f, -36f, -24.2f, 9f, 1, 13, "VICE MOTEL", neonPink, stuccoMint);
+        Building(c, "Bldg_S3", -6f, 16f, -36f, -24.2f, 14f, 1, 17, "SUNRISE HOTEL", neonPink, stuccoWhite);
+        Building(c, "Bldg_S4", 16f, 37f, -36f, -24.2f, 10f, 1, 19, "BEACH CLUB", neonCyan, stuccoPeach);
         // концы улицы
-        Building(c, "Bldg_EndW", -58f, -52f, -36f, 14f, 12f, 0, 23);
-        Building(c, "Bldg_EndE", 52f, 58f, -21.1f, 14f, 12f, 0, 29);
-        Building(c, "Bldg_Corner", 46f, 58f, -40f, -21.3f, 10f, 0, 31);
+        Building(c, "Bldg_EndW", -58f, -52f, -36f, 14f, 12f, 0, 23, null, null, stuccoMint);
+        Building(c, "Bldg_EndE", 52f, 58f, -21.1f, 14f, 12f, 0, 29, null, null, stuccoPink);
+        Building(c, "Bldg_Corner", 46f, 58f, -40f, -21.3f, 10f, 0, 31, null, null, stuccoTeal);
     }
 
     // =========================================================================== уличные мелочи (Tripo) и фонари
@@ -285,23 +358,15 @@ public static partial class BankVisualOverhaul
     {
         var g = Group(ex, "StreetProps");
         var lights = Group(root, "StreetLights");
-        foreach (float x in new[] { -24f, -12f, 12f, 24f })
+        // закат: фонари ещё не горят (без источников света — экономия для Quest)
+        foreach (float x in new[] { -24f, -12f, 12f, 24f }) Place(g, "Bank_StreetLamp", new Vector3(x, SidewalkY, -9.7f), 0f, 4.8f);
+        foreach (float x in new[] { -30f, -6f, 18f }) Place(g, "Bank_StreetLamp", new Vector3(x, SidewalkY, -21.8f), 180f, 4.8f);
+        // пальмы в кадках вдоль тротуаров и у входа
+        if (Prefab("Bank_PalmPlanter"))
         {
-            var lamp = Place(g, "Bank_StreetLamp", new Vector3(x, SidewalkY, -9.7f), 0f, 4.8f);
-            if (!lamp) continue;
-            var b = WorldBounds(lamp);
-            var head = new Vector3(b.center.x, b.max.y - 0.55f, b.center.z);
-            Ball(g, "LampGlow", head, Vector3.one * 0.3f, lampBulb);
-            var go = new GameObject("StreetLight");
-            go.transform.SetParent(lights, false);
-            go.transform.position = head - Vector3.up * 0.3f;
-            var l = go.AddComponent<Light>();
-            l.type = LightType.Point; l.color = new Color(1f, 0.74f, 0.42f); l.intensity = 3.2f; l.range = 11f; l.shadows = LightShadows.None;
-        }
-        foreach (float x in new[] { -30f, -6f, 18f })                               // на той стороне — без источников, только светящийся плафон
-        {
-            var lamp = Place(g, "Bank_StreetLamp", new Vector3(x, SidewalkY, -21.8f), 180f, 4.8f);
-            if (lamp) { var b = WorldBounds(lamp); Ball(g, "LampGlow", new Vector3(b.center.x, b.max.y - 0.55f, b.center.z), Vector3.one * 0.3f, lampBulb); }
+            foreach (float x in new[] { -40f, -32f, -18f, 18f, 30f, 40f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -9.4f), x * 7f, 4.6f);
+            foreach (float x in new[] { -44f, -36f, -26f, -14f, -2f, 10f, 22f, 33f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -22.6f), x * 5f, 4.2f);
+            foreach (float x in new[] { -15.5f, 15.5f }) Place(g, "Bank_PalmPlanter", new Vector3(x, SidewalkY, -3.2f), 0f, 5.2f);
         }
         Place(g, "Bank_FireHydrant", new Vector3(-17f, SidewalkY, -9.6f), 0f, 0.8f);
         Place(g, "Bank_FireHydrant", new Vector3(31f, SidewalkY, -21.9f), 180f, 0.8f);
@@ -311,8 +376,9 @@ public static partial class BankVisualOverhaul
         Place(g, "Bank_NewsBox", new Vector3(8.8f, SidewalkY, -9.4f), 180f, 1.25f);
         Place(g, "Bank_NewsBox", new Vector3(-28f, SidewalkY, -22f), 0f, 1.25f);
         // у входа в банк: растения в кадках и банкомат на фасаде
-        Place(g, "Bank_PottedPlant", new Vector3(-2.6f, 0f, -1.1f), 0f, 1.6f);
-        Place(g, "Bank_PottedPlant", new Vector3(2.6f, 0f, -1.1f), 0f, 1.6f);
+        string entrancePlant = Prefab("Bank_PalmPlanter") ? "Bank_PalmPlanter" : "Bank_PottedPlant";
+        Place(g, entrancePlant, new Vector3(-2.6f, 0f, -1.1f), 0f, 2.6f);
+        Place(g, entrancePlant, new Vector3(2.6f, 0f, -1.1f), 30f, 2.6f);
         Place(g, "Bank_ATM", new Vector3(17.5f, SidewalkY, -0.95f), 180f, 1.9f);
     }
 

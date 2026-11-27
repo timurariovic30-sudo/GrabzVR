@@ -19,6 +19,9 @@ public class NetworkVaultDoor : NetworkBehaviour
     public float openAngle = -105f;
     public float swingSpeed = 70f;
     public float hackSeconds = 5f;
+    [Tooltip("Тексты таблички и сообщения на табло (дверь универсальная: хранилище, служебные входы)")]
+    public string openText = "ХРАНИЛИЩЕ ОТКРЫТО";
+    public string closedText = "ХРАНИЛИЩЕ ЗАКРЫТО";
 
     [Header("Эффекты")]
     public TextMeshPro statusText;
@@ -98,7 +101,7 @@ public class NetworkVaultDoor : NetworkBehaviour
         {
             shownOpen = open;
             Play(open ? openClips : closeClips);
-            if (HeistGameManager.Instance) HeistGameManager.Instance.PostEvent(open ? "ХРАНИЛИЩЕ ОТКРЫТО!" : "ДВЕРЬ ХРАНИЛИЩА ЗАКРЫТА");
+            if (HeistGameManager.Instance) HeistGameManager.Instance.PostEvent(open ? openText + "!" : closedText);
         }
         if (Hacking && Time.time >= nextBeep) { nextBeep = Time.time + 0.5f; Play(hackClips); }
 
@@ -111,7 +114,7 @@ public class NetworkVaultDoor : NetworkBehaviour
         if (hinge) hinge.localRotation = Quaternion.Euler(0f, angle, 0f);
         bool open = Open, hacking = Hacking;
         if (statusText)
-            statusText.text = hacking ? $"ВЗЛОМ… {HackLeft:0.0}" : open ? "ХРАНИЛИЩЕ ОТКРЫТО" : "ХРАНИЛИЩЕ ЗАКРЫТО";
+            statusText.text = hacking ? $"ВЗЛОМ… {HackLeft:0.0}" : open ? openText : closedText;
         if (statusLamp)
         {
             block ??= new MaterialPropertyBlock();

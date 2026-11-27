@@ -34,7 +34,9 @@ public static partial class BankVisualOverhaul
     const string DecorRoot = "BankDecor";
     static readonly string[] TripoNames = { "Bank_VaultDoor", "Bank_GoldenStatue", "Bank_ReceptionDesk", "Bank_GetawayTruck",
         "Bank_SecurityCamera", "Bank_IronBars", "Bank_ATM", "Bank_TellerCounter", "Bank_OfficeDesk", "Bank_PottedPlant", "Bank_LeatherBench",
-        "Bank_StreetLamp", "Bank_FireHydrant", "Bank_TrashCan", "Bank_NewsBox" };
+        "Bank_StreetLamp", "Bank_FireHydrant", "Bank_TrashCan", "Bank_NewsBox",
+        "Bank_MiamiTellerDesk", "Bank_OfficeChair", "Bank_CashRegister", "Bank_BreakSofa", "Bank_Kitchenette", "Bank_StaffLockers",
+        "Bank_WaterCooler", "Bank_DirectorDesk", "Bank_SecurityMonitors", "Bank_ServerRack", "Bank_PalmPlanter" };
 
     static readonly StringBuilder log = new StringBuilder();
     static Material marble, marbleDark, limestone, plaster, plasterCool, wallpaper, woodPanel, carpet, armor, armorLight, tread,
@@ -78,6 +80,7 @@ public static partial class BankVisualOverhaul
         BuildStatue(root, st, statueLoot, scene);
         BuildInteriorProps(root, st, map, scene);
         BuildExterior(root, st, map, scene);
+        BuildServiceWingAndBasement(root, st, map, scene);
         BuildLighting(root, map);
         BuildPostFX(root, scene);
 
@@ -109,16 +112,18 @@ public static partial class BankVisualOverhaul
         var shots = new (string name, Vector3 pos, Vector3 look)[]
         {
             ("Bank_00_warmup", new Vector3(6f, 1.2f, -19f), new Vector3(0, 2f, -4f)),   // первый кадр в batchmode без прогретого света
-            ("Bank_01_street_van", new Vector3(7f, 0.9f, -20f), new Vector3(0f, 2.5f, -5f)),
-            ("Bank_02_facade", new Vector3(-16f, 1.5f, -20.5f), new Vector3(0f, 6f, -1f)),
-            ("Bank_03_in_van", new Vector3(0.8f, 0.7f, -7.6f), new Vector3(0f, -0.1f, -12.8f)),
-            ("Bank_04_hall_tellers", new Vector3(0f, 1.7f, 7f), new Vector3(0f, 1.6f, 22f)),
-            ("Bank_05_vault_door", new Vector3(3.2f, 1.7f, 17f), new Vector3(0f, 1.8f, 23.6f)),
-            ("Bank_06_offices", new Vector3(-16f, 6.3f, 14.5f), new Vector3(-27f, 5.0f, 22f)),
-            ("Bank_07_vault", new Vector3(-1f, 1.7f, 24.8f), new Vector3(-4f, 1.2f, 38f)),
-            ("Bank_08_statue", new Vector3(24f, 1.6f, 14.2f), new Vector3(24f, 1.2f, 16.5f)),
-            ("Bank_09_garage", new Vector3(26.5f, -1.4f, 33f), new Vector3(20f, -2f, 36f)),
-            ("Bank_10_camera", new Vector3(11.8f, 6f, 2.2f), new Vector3(13.4f, 6.8f, 0.6f)),
+            ("Bank_01_miami_street", new Vector3(-17f, 1.2f, -20.5f), new Vector3(0f, 5f, -1f)),
+            ("Bank_02_facade_sign", new Vector3(4f, 0.8f, -15.5f), new Vector3(0f, 10.5f, -2.5f)),
+            ("Bank_03_van", new Vector3(0.8f, 0.7f, -7.6f), new Vector3(0f, -0.1f, -12.8f)),
+            ("Bank_04_hall_tellers", new Vector3(0f, 1.7f, 6f), new Vector3(0f, 1.8f, 22f)),
+            ("Bank_05_teller_workzone", new Vector3(-12.5f, 1.7f, 22.8f), new Vector3(-2f, 1.0f, 18.5f)),
+            ("Bank_06_corridor_stairs", new Vector3(-8.5f, 1.7f, 25.2f), new Vector3(2f, -1f, 26.5f)),
+            ("Bank_07_break_room", new Vector3(-7.0f, 1.7f, 29f), new Vector3(-12f, 0.8f, 36f)),
+            ("Bank_08_director", new Vector3(2.0f, 1.7f, 29.5f), new Vector3(7f, 1.0f, 37f)),
+            ("Bank_09_server_vent", new Vector3(-1.0f, 1.7f, 29f), new Vector3(-4.5f, 0.4f, 38f)),
+            ("Bank_10_basement_stairs", new Vector3(6f, -1.4f, 26.5f), new Vector3(-3f, -1.5f, 26.4f)),
+            ("Bank_11_vault_door", new Vector3(5.5f, -1.3f, 26.5f), new Vector3(0f, -1.8f, 30.6f)),
+            ("Bank_12_basement_vault", new Vector3(8.5f, -1.2f, 31.8f), new Vector3(-4f, -2.2f, 38f)),
         };
         var go = new GameObject("PreviewCam");
         var cam = go.AddComponent<Camera>();
@@ -434,10 +439,10 @@ public static partial class BankVisualOverhaul
         // Офисы ← стена Холла x = −14 (сторона офисов)
         Panel(g, "Clad_Office_HallWall", true, -14.155f, 0, 24, 0, 9, T, wallpaper, (4f, 6.5f, 0f, 2.8f), (14f, 16.5f, 4.8f, 7.3f));
         // Хранилище ← стена офисов x = −14 (сторона хранилища) и стена Холла z = 24 (сторона хранилища, проём решётки)
-        Panel(g, "Clad_Vault_OfficeWall", true, -13.845f, 24, 40, 0, 6, T, armor);
-        Panel(g, "Clad_Vault_HallWall", false, 24.155f, -14, 10, 0, 6, T, armor, (-1.5f, 1.5f, 0f, 3f));
+        // служебное крыло (бывшее хранилище на первом этаже) ← стена офисов x = −14
+        Panel(g, "Clad_Service_OfficeWall", true, -13.845f, 24, 40, 0, 6, T, serviceWall);
         // Гараж ← стена хранилища x = 10 и стена галереи z = 24 (проём пандуса)
-        Panel(g, "Clad_Garage_VaultWall", true, 10.155f, 24, 40, -3, 2.5f, T, concrete);
+        Panel(g, "Clad_Garage_VaultWall", true, 10.155f, 24, 40, -3, 2.5f, T, concrete, (25f, 28.2f, -3f, -0.8f));   // проём из подвала в гараж
         Panel(g, "Clad_Garage_GalleryWall", false, 24.155f, 14, 34, -3, 2.5f, T, concrete, (28f, 33f, 0f, 2.5f));
         // Галерея ← стена Холла x = 14 (сторона галереи, арка)
         Panel(g, "Clad_Gallery_HallWall", true, 14.155f, 0, 24, 0, 6, T, plasterCool, (8f, 12f, 0f, 3.5f));
@@ -488,9 +493,10 @@ public static partial class BankVisualOverhaul
     {
         var g = Group(st, "AccentStrips");
         // хранилище: красная полоса по северной стене, синие — по боковым
-        Box(g, "Vault_Strip_N", new Vector3(-2, 5.6f, 39.8f), new Vector3(23.4f, 0.06f, 0.06f), stripGold);
-        Box(g, "Vault_Strip_W", new Vector3(-13.8f, 5.6f, 32), new Vector3(0.06f, 0.06f, 15.4f), stripGold);
-        Box(g, "Vault_Strip_E", new Vector3(9.8f, 5.6f, 32), new Vector3(0.06f, 0.06f, 15.4f), stripGold);
+        // подземное хранилище: золотые полосы под потолком подвала
+        Box(g, "Vault_Strip_N", new Vector3(-2, -0.45f, 39.8f), new Vector3(23.4f, 0.06f, 0.06f), stripGold);
+        Box(g, "Vault_Strip_W", new Vector3(-13.8f, -0.45f, 35.5f), new Vector3(0.06f, 0.06f, 8.6f), stripGold);
+        Box(g, "Vault_Strip_E", new Vector3(9.8f, -0.45f, 35.5f), new Vector3(0.06f, 0.06f, 8.6f), stripGold);
         // гараж: светящиеся полосы на колоннах
         foreach (var (p, i) in new[] { new Vector3(13.5f, -3, 29), new Vector3(25, -3, 29), new Vector3(25, -3, 40.5f), new Vector3(13.5f, -3, 40.5f) }.Select((p, i) => (p, i)))
             Box(g, "Pillar_Strip", p + new Vector3(0, 2.1f, 0), new Vector3(0.74f, 0.07f, 0.74f), i % 2 == 0 ? stripRed : stripBlue);
@@ -757,7 +763,7 @@ public static partial class BankVisualOverhaul
 
     static void BuildStatue(Transform root, Transform st, GameObject lootPrefab, UnityEngine.SceneManagement.Scene scene)
     {
-        var center = new Vector3(24f, 0, 16.5f);
+        var center = new Vector3(4.0f, BasementY, 38.0f);                         // в подземном хранилище
         var g = Group(st, "StatuePedestal");
         Box(g, "Pedestal", center + Vector3.up * 0.3f, new Vector3(0.95f, 0.6f, 0.95f), marbleDark, true);
         Box(g, "PedestalTop", center + Vector3.up * 0.615f, new Vector3(1.05f, 0.03f, 1.05f), brass, true);
@@ -793,9 +799,9 @@ public static partial class BankVisualOverhaul
         {
             foreach (var l in lights.Where(x => x.name == name)) { l.color = c; l.intensity = intensity; if (range.HasValue) l.range = range.Value; l.shadows = LightShadows.None; EditorUtility.SetDirty(l); }
         }
-        // Операционный зал — холодный деловой свет
-        Set("HallLight", new Color(0.84f, 0.92f, 1f), 3.3f);
-        Set("BalconyLight", new Color(0.8f, 0.9f, 1f), 1.5f);
+        // Операционный зал Майами — тёплый светлый (плюс лучи заката из панорамных окон)
+        Set("HallLight", new Color(1f, 0.9f, 0.82f), 3.0f);
+        Set("BalconyLight", new Color(1f, 0.85f, 0.8f), 1.5f);
         // Галерея — холодный музейный
         Set("MuseumSpot", new Color(0.76f, 0.87f, 1f), 7f);
         Set("GalleryFill", new Color(0.66f, 0.78f, 1f), 1.3f);
@@ -845,7 +851,7 @@ public static partial class BankVisualOverhaul
         // мягкий Bloom в четверть разрешения: светятся лазеры, огоньки камер, лампы, полосы, пульсирующее золото лута
         var bloom = Comp<Bloom>(profile);
         bloom.threshold.Override(0.9f);
-        bloom.intensity.Override(0.45f);
+        bloom.intensity.Override(0.55f);
         bloom.scatter.Override(0.55f);
         bloom.tint.Override(Color.white);
         bloom.highQualityFiltering.Override(false);
@@ -854,8 +860,8 @@ public static partial class BankVisualOverhaul
         var ca = Comp<ColorAdjustments>(profile);
         ca.postExposure.Override(0.1f);
         ca.contrast.Override(14f);
-        ca.saturation.Override(8f);
-        ca.colorFilter.Override(new Color(1f, 0.98f, 0.95f));
+        ca.saturation.Override(18f);                                             // сочные цвета Майами
+        ca.colorFilter.Override(new Color(1f, 0.95f, 0.93f));
         EditorUtility.SetDirty(profile);
         foreach (var c in profile.components) EditorUtility.SetDirty(c);
 
