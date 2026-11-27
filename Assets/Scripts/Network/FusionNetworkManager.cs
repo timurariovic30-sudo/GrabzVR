@@ -33,6 +33,8 @@ public class FusionNetworkManager : MonoBehaviour
     public string LastError { get; private set; } = "";
 
     Recorder recorder;
+    /// Свой микрофон (Photon Voice Recorder) — по его громкости хлопает рот своей гориллы в зеркале.
+    public Recorder VoiceRecorder => recorder;
     InputAction pttLeft, pttRight;
     float spawnRetryAt;
     int lastLoadRequest = -1; float lastLoadTime = -10f;

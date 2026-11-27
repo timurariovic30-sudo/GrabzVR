@@ -4,7 +4,7 @@ using UnityEngine;
 public static class ProceduralAudio
 {
     const int Rate = 44100;
-    static AudioClip coin, siren, beep, engine, keyClick;
+    static AudioClip coin, siren, beep, engine, keyClick, bonk;
 
     /// Механический «клик» клавиши: резкий щелчок (шум + высокий тон, 8 мс) и глухой «тук» дна (через 25 мс).
     public static AudioClip KeyClick()
@@ -104,6 +104,40 @@ public static class ProceduralAudio
         coin = AudioClip.Create("ProceduralCoin", data.Length, 1, Rate, false);
         coin.SetData(data, 0);
         return coin;
+    }
+
+    /// Мультяшный нокаут: глухой «бум» о пол + «бонк» с падающим тоном + вялое «уа-уа» в конце.
+    public static AudioClip Bonk()
+    {
+        if (bonk != null) return bonk;
+        float len = 0.9f;
+        var data = new float[(int)(Rate * len)];
+        var rnd = new System.Random(11);
+        float phase = 0f;
+        for (int i = 0; i < data.Length; i++)
+        {
+            float t = i / (float)Rate;
+            // глухой удар тела: низкий тон + шумовой хлопок
+            float thud = Mathf.Sin(2 * Mathf.PI * 75f * t) * 0.6f * Mathf.Exp(-t * 18f)
+                       + ((float)rnd.NextDouble() * 2f - 1f) * 0.35f * Mathf.Exp(-t * 60f);
+            // «бонк»: тон падает 820 → 260 Гц
+            float f = Mathf.Lerp(820f, 260f, Mathf.Clamp01(t / 0.22f));
+            phase += 2 * Mathf.PI * f / Rate;
+            float bonkV = t < 0.35f ? Mathf.Sin(phase) * 0.32f * Mathf.Exp(-t * 9f) : 0f;
+            // «уа-уа»: два коротких сползающих тона с вибрато
+            float wt = t - 0.38f, wah = 0f;
+            if (wt > 0f)
+            {
+                float seg = wt < 0.22f ? 0f : 1f;
+                float st = wt - seg * 0.22f;
+                float wf = (seg == 0f ? 330f : 262f) * (1f - st * 0.35f) * (1f + 0.04f * Mathf.Sin(2 * Mathf.PI * 7f * st));
+                wah = Mathf.Sin(2 * Mathf.PI * wf * st) * 0.16f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(st / (seg == 0f ? 0.22f : 0.3f)));
+            }
+            data[i] = thud + bonkV + wah;
+        }
+        bonk = AudioClip.Create("ProceduralBonk", data.Length, 1, Rate, false);
+        bonk.SetData(data, 0);
+        return bonk;
     }
 
     /// Сирена-пищалка: чередование двух тонов (прямоугольная волна), удобно зациклить.

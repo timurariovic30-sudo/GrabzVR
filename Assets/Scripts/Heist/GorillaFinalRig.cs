@@ -100,7 +100,17 @@ public class GorillaFinalRig : MonoBehaviour
         }
         Solve(left);
         Solve(right);
+        Solved?.Invoke();
     }
+
+    /// Вызывается после каждого решения рига (LateUpdate и перед рендером) —
+    /// например, GorillaFallRagdoll плавно смешивает позу «лёжа» с позой рига, когда горилла встаёт.
+    public event System.Action Solved;
+
+    /// Кости, которые риг сам выставляет каждый кадр (голова и обе руки).
+    public bool Drives(Transform bone) =>
+        bone && (bone == headBone || bone == left.upper || bone == left.lower || bone == left.hand ||
+                 bone == right.upper || bone == right.lower || bone == right.hand);
 
     /// Отражение поворота через плоскость YZ (лево ↔ право в осях корня).
     static Quaternion MirrorX(Quaternion q) => new Quaternion(q.x, -q.y, -q.z, q.w);

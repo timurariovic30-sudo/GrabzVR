@@ -44,6 +44,15 @@ public class NetworkGorillaAvatar : NetworkBehaviour
         return string.Join(",", list);
     }
     [Networked] public NetworkString<_16> Nick { get; set; }
+    /// Выражение лица (GorillaFaceEmotes): обычное / натуга / испуг / нокаут.
+    [Networked] public byte FaceEmote { get; set; }
+    /// Счётчик нокаутов (GorillaFallRagdoll): вырос — у всех эта горилла падает тряпичной куклой.
+    [Networked] public int KnockoutCount { get; set; }
+
+    /// Это видимая горилла другого игрока (не своя невидимая копия и уже заспавнена).
+    public bool IsRemoteVisible => Object != null && Object.IsValid && !HasStateAuthority;
+    /// Своя невидимая копия (или ещё не заспавнена) — реакции на ней ничего не показывают.
+    public bool IsHiddenSelf => Object == null || !Object.IsValid || HasStateAuthority;
 
     [Header("Ссылки (заполняет билдер)")]
     public GorillaFinalRig rig;
@@ -101,6 +110,12 @@ public class NetworkGorillaAvatar : NetworkBehaviour
         if (localSkin) FurRGB = new Vector3(localSkin.furColor.r, localSkin.furColor.g, localSkin.furColor.b);
         Cosmetic = EncodeCosmetics(GameSession.WornCosmetics);
         Nick = GrabzSettings.PlayerName;
+
+        // живые реакции: лицо и нокаут считает локальный игрок, остальные только показывают
+        var emotes = r.GetComponent<GorillaFaceEmotes>();
+        if (emotes) FaceEmote = (byte)emotes.LocalEmote;
+        var fall = r.GetComponent<GorillaFallRagdoll>();
+        if (fall) KnockoutCount = fall.KnockoutCount;
 
         var pose = r.GetComponentInParent<VRHandPoseController>();
         if (pose)

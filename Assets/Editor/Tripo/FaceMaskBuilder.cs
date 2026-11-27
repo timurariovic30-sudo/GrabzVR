@@ -96,7 +96,7 @@ public static class FaceMaskBuilder
         finally { PrefabUtility.UnloadPrefabContents(net); }
 
         // 3) ПК-гориллы в сценах + образец на витрине хаба
-        foreach (var path in new[] { HubPath })   // ветка hub: сцену ограбления (HeistLevel_Test) не трогаем
+        foreach (var path in new[] { HubPath, HeistPath })   // main: балаклавы и у ПК-гориллы в Банке
         {
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
             foreach (var rig in Object.FindObjectsByType<GorillaFinalRig>(FindObjectsInactive.Include))
