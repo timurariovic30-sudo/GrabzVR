@@ -83,6 +83,7 @@
   - `HeistGameManager` / `AlarmSystem` / `BreakableGlass` / `LootRegistry` автоматически работают через `HeistNetworkState`, если он заспавнен. Без сети всё работает локально.
   - Лут: на каждом префабе `NetworkObject` (Allow State Authority Override), `NetworkTransform` и `NetworkLootItem`. При хвате вызывается `RequestStateAuthority()`, и физику считает взявший игрок. Предмет в чужих руках взять нельзя. Сданный или разбитый лут **прячется, а не уничтожается**, сброс возвращает его на место.
   - Новые сетевые объекты сцены после правки нужно запечь (`Tools/Fusion/Scene/Bake Scene Objects`; при сохранении сцены Fusion делает это сам), а префабы попадают в таблицу через `Tools/Fusion/Rebuild Prefab Table`.
+- **Рейс автобуса из Хаба** — `HubBusTrip` на `BusTrip_Net` (MainHub, Master Client Object; ставит `Tools/Heist/Hub/Bus Trip (Network)`, идемпотентный). Клиенты шлют хосту «я в салоне»; первый зашедший запускает общий `TickTimer` 10 с (все вышли — сброс), отсчёт на табло у всех по нему. Затем `Departing` + тик старта: дверь закрывается, автобус едет 5 с, с 3.5 с затемнение 1.5 с; хост грузит уровень (`LoadSceneSynced`) только когда все клиенты прислали «экран чёрный» (или через 2.5 с запаса). Затемнение — `ScreenFade` (сфера вокруг головы, DontDestroyOnLoad): на новой сцене сама плавно осветляет за 1.5 с после появления камеры. Без сети работает старый локальный `VanPortal`.
 - PlayFab (`PlayFabAuthManager`, MainHub): тихий вход по ID устройства, цвет шерсти хранится в UserData `FurColor`.
 
 ## Проверка перед коммитом

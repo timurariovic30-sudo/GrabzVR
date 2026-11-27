@@ -98866,6 +98866,84 @@ Transform:
   - {fileID: 185895719}
   m_Father: {fileID: 1202789184}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1876312276
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1876312279}
+  - component: {fileID: 1876312278}
+  - component: {fileID: 1876312277}
+  m_Layer: 0
+  m_Name: BusTrip_Net
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1876312277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1876312276}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41f2d292ea13c35469238c27c328c12a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HubBusTrip
+  portal: {fileID: 671958578}
+  bus: {fileID: 1753188968}
+  countdown: 10
+  driveTime: 5
+  fadeTime: 1.5
+  fadeWaitLimit: 2.5
+  _OccupantMask: 0
+  _Departing:
+    RawValue: 0
+  _DepartTick: 0
+  _FadedMask: 0
+  _Loading:
+    RawValue: 0
+--- !u!114 &1876312278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1876312276}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 2604088483
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 131074
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 1876312277}
+  ForceRemoteRenderTimeframe: 0
+--- !u!4 &1876312279
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1876312276}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 4.2, y: 1.375, z: 12.718777}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1877862270
 GameObject:
   m_ObjectHideFlags: 0
@@ -113688,3 +113766,4 @@ SceneRoots:
   - {fileID: 827243791}
   - {fileID: 1753188970}
   - {fileID: 1202789184}
+  - {fileID: 1876312279}

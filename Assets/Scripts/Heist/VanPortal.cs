@@ -34,13 +34,22 @@ public class VanPortal : MonoBehaviour
         if (engineSource && !engineSource.clip) engineSource.clip = ProceduralAudio.EngineStart();
     }
 
+    /// Точка в зоне салона (BoxCollider этого объекта)?
+    public bool Contains(Vector3 world)
+    {
+        if (!zone) zone = GetComponent<BoxCollider>();
+        if (!zone) return false;
+        Vector3 local = transform.InverseTransformPoint(world) - zone.center;
+        Vector3 half = zone.size * 0.5f;
+        return Mathf.Abs(local.x) <= half.x && Mathf.Abs(local.y) <= half.y && Mathf.Abs(local.z) <= half.z;
+    }
+
     void Update()
     {
+        // в сети рейсом управляет HubBusTrip (общий таймер Fusion, отправление и загрузка у всех разом)
+        if (HubBusTrip.Active) { if (running != null) { StopCoroutine(running); running = null; } return; }
         if (!zone || !switcher) return;
-        Vector3 p = switcher.ActivePlayerPosition();
-        Vector3 local = transform.InverseTransformPoint(p) - zone.center;
-        Vector3 half = zone.size * 0.5f;
-        bool inside = Mathf.Abs(local.x) <= half.x && Mathf.Abs(local.y) <= half.y && Mathf.Abs(local.z) <= half.z;
+        bool inside = Contains(switcher.ActivePlayerPosition());
 
         if (inside && running == null) running = StartCoroutine(Countdown());
         else if (!inside && running != null && !(bus && bus.IsDriving))   // автобус уже едет (и везёт салон) — не отменяем
@@ -77,7 +86,10 @@ public class VanPortal : MonoBehaviour
             StartCoroutine(bus.DriveOff());
             yield return new WaitForSeconds(Mathf.Max(0f, bus.driveTime - fadeTime));
         }
-        yield return ScreenFader.FadeOut(fadeMaterial, fadeTime);
+        // плавное затемнение (сфера вокруг головы, переживает смену сцены — на карте сама плавно осветлит)
+        bool faded = false;
+        ScreenFade.Ensure(fadeMaterial).Out(fadeTime, () => faded = true);
+        while (!faded) yield return null;
         if (preload != null) { preload.allowSceneActivation = true; yield break; }
         // в сети — едут все игроки сессии (общая смена сцены Fusion), без сети — как раньше
         if (!FusionNetworkManager.LoadSceneSynced(sceneName)) SceneManager.LoadSceneAsync(sceneName);
