@@ -70,6 +70,8 @@ public static class HubForestBuilder
         Watchtower();
         Parkour();
         Greenery();
+        Details();
+        ClearTunnel();
         AddColliders();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -211,7 +213,9 @@ public static class HubForestBuilder
     }
     static float R(float a, float b) => a + (float)rnd.NextDouble() * (b - a);
     /// Запрет на коридор салона автобуса (BlackBusBuilder): x 2.8…5.6, z 7.3…18.2, y 0…2.6.
-    static bool BlocksBus(Bounds b) =>
+    /// Труба тоннеля BusTunnel (x 0.8…7.6, z 14…74) с запасом: автобус едет по ней при выезде.
+    static readonly Bounds TunnelBox = new Bounds(new Vector3(4.2f, 2.5f, 45f), new Vector3(8.6f, 6f, 63f));
+    static bool BlocksBus(Bounds b) => b.Intersects(TunnelBox) ||
         b.max.x > 2.6f && b.min.x < 5.8f && b.max.z > 13.6f && b.min.z < 18.6f && b.min.y < 2.8f && b.max.y > 0.05f   // салон за стеной
         || b.max.x > 0.6f && b.min.x < 7.8f && b.max.z > 6.5f && b.min.z < 13.8f && b.max.y > 0.05f;                 // ворота и площадка автобуса
     static bool InBusCorridor(Vector3 p, float r = 0.5f) => p.x > 2.8f - r && p.x < 5.6f + r && p.z > 7.3f - r && p.z < 18.2f + r;
@@ -279,7 +283,10 @@ public static class HubForestBuilder
     static void Ground()
     {
         var g = Group("Ground");
-        Box("Grass", new Vector3(0, -0.2f, -2f), new Vector3(130, 0.4f, 130), "M_HubF_Grass", g, true, 0f);
+        // трава не заходит под пол тоннеля (иначе зелёный пол мерцает поверх асфальта тоннеля)
+        Box("Grass", new Vector3(0, -0.2f, -26.6f), new Vector3(130, 0.4f, 80.8f), "M_HubF_Grass", g, true, 0f);
+        Box("Grass_NW", new Vector3(-32.35f, -0.25f, 38.4f), new Vector3(65.3f, 0.4f, 49.2f), "M_HubF_Grass", g, true, 0f);
+        Box("Grass_NE", new Vector3(36.55f, -0.25f, 38.4f), new Vector3(56.9f, 0.4f, 49.2f), "M_HubF_Grass", g, true, 0f);
         Box("Path_SpawnToFire", new Vector3(0, 0.012f, -3f), new Vector3(2.2f, 0.02f, 8.5f), "M_HubF_Gravel", g, false, 0.6f);
         var toGate = Box("Path_FireToGate", new Vector3(2.2f, 0.012f, 5.6f), new Vector3(2.4f, 0.02f, 6.4f), "M_HubF_Gravel", g, false, 0.6f);
         toGate.transform.rotation = Quaternion.Euler(0, 20f, 0);
@@ -327,7 +334,8 @@ public static class HubForestBuilder
             var p = new Vector3(Mathf.Cos(a) * 38f, -3f, Mathf.Sin(a) * 34f - 2f);
             Blob("Hill", p, new Vector3(R(22, 34), R(10, 16), R(18, 28)), "M_HubF_Hill", g, false);
         }
-        Blob("Hill_N", new Vector3(0, -2f, 30f), new Vector3(70, 22, 22), "M_HubF_Hill", g, false);
+        Blob("Hill", new Vector3(-24f, -2f, 32f), new Vector3(40, 22, 22), "M_HubF_Hill", g, false);
+        Blob("Hill", new Vector3(32f, -2f, 32f), new Vector3(40, 22, 22), "M_HubF_Hill", g, false);
         int nudged = 0;
         foreach (Transform t in g)
         {
@@ -511,10 +519,11 @@ public static class HubForestBuilder
                 float a = (i + R(-0.3f, 0.3f)) / (26f + ring * 6) * Mathf.PI * 2f;
                 float rx = 27f + ring * 6f + R(-2f, 2f), rz = 24f + ring * 6f + R(-2f, 2f);
                 var p = new Vector3(Mathf.Cos(a) * rx, 0, Mathf.Sin(a) * rz - 2f);
-                if (p.z > 11f && Mathf.Abs(p.x) < 14f) p.z += 8f;                // за скалой — подальше
+                if (p.z > 11f && Mathf.Abs(p.x) < 14f) p.z += 8f;                // за скалой — подальше (из тоннеля убирает BlocksBus ниже)
                 if (InBusCorridor(p, 3f)) continue;
                 bool pine = (i + ring) % 3 != 0;
                 var t = N(pine ? pines[i % 5] : commons[i % 5], p, R(0, 360), g, pine ? R(10f, 16f) : R(8f, 12f));
+                if (t && BlocksBus(Bounds(t))) { Object.DestroyImmediate(t); continue; }
                 if (t) { t.name = (pine ? "Pine" : "Tree") + "_ring"; trees++; }
             }
         // несколько деревьев внутри двора (на них тоже можно залезть)
@@ -536,6 +545,88 @@ public static class HubForestBuilder
         // грибы и травка у костра, папоротники у гардероба
         foreach (var p in new[] { new Vector3(-2.9f, 0, 3.9f), new Vector3(2.7f, 0, -0.8f), new Vector3(-7.4f, 0, -5.4f), new Vector3(-7.4f, 0, 9.2f) }) { N("Fern_1", p, R(0, 360), props, 0.9f); plants++; }
         log.AppendLine($"  forest: {trees} trees, {plants} small plants");
+    }
+
+    // ================================================================== тоннель автобуса: внутри ничего лишнего
+    static void ClearTunnel()
+    {
+        int removed = 0;
+        foreach (Transform g in root)
+        {
+            if (g.name == "Ground" || g.name == "Boundary") continue;
+            foreach (Transform t in g.Cast<Transform>().ToList())
+                if (Bounds(t.gameObject).Intersects(TunnelBox)) { Object.DestroyImmediate(t.gameObject); removed++; }
+        }
+        log.AppendLine($"  tunnel cleared: {removed} objects removed from the bus tunnel");
+    }
+
+    // ================================================================== детали двора: фонарики, пеньки, дрова, светлячки, указатель
+    static void Details()
+    {
+        var g = Group("Details");
+        // фонарики вдоль дорожек — только светящиеся меши, без источников света (Quest)
+        var lanterns = new[] { new Vector3(1.4f, 0, -6.2f), new Vector3(-1.4f, 0, -4.4f), new Vector3(1.4f, 0, -1.8f), new Vector3(3.6f, 0, 4.6f), new Vector3(0.8f, 0, 6.4f),
+                               new Vector3(5.7f, 0, 7.6f), new Vector3(-3.4f, 0, 2.6f), new Vector3(-6.8f, 0, 0.5f), new Vector3(3.8f, 0, -2.6f), new Vector3(6.5f, 0, -4.4f) };
+        foreach (var p in lanterns)
+        {
+            Box("LanternPost", p + Vector3.up * 0.45f, new Vector3(0.09f, 0.9f, 0.09f), "M_WoodDark", g, true, 0.5f);
+            Box("LanternCap", p + Vector3.up * 1.12f, new Vector3(0.24f, 0.05f, 0.24f), "M_WoodDark", g, false, 0f);
+            Box("LanternGlow", p + Vector3.up * 0.99f, new Vector3(0.16f, 0.2f, 0.16f), "M_Bulb", g, false, 0f).GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+        }
+        // пеньки-сиденья у костра и у площадки
+        foreach (var p in new[] { new Vector3(-2.6f, 0, -0.4f), new Vector3(2.7f, 0, 3.8f), new Vector3(6.6f, 0, -8.4f), new Vector3(6.6f, 0, -5.6f), new Vector3(-5.8f, 0, -6.4f) })
+        {
+            var s = GameObject.CreatePrimitive(PrimitiveType.Cylinder); s.name = "Stump"; s.transform.SetParent(g, false);
+            s.transform.position = p + Vector3.up * 0.23f; s.transform.localScale = new Vector3(0.55f, 0.23f, 0.55f);
+            s.transform.rotation = Quaternion.Euler(0, R(0, 360), 0); s.GetComponent<Renderer>().sharedMaterial = M("M_WoodDark");
+        }
+        // поленница у костра
+        for (int row = 0; row < 3; row++)
+            for (int i = 0; i < 5 - row; i++)
+            {
+                var lg = GameObject.CreatePrimitive(PrimitiveType.Cylinder); lg.name = "Firewood"; lg.transform.SetParent(g, false);
+                lg.transform.position = new Vector3(-3.1f + i * 0.22f + row * 0.11f, 0.1f + row * 0.19f, 4.1f);
+                lg.transform.rotation = Quaternion.Euler(90, 0, 0); lg.transform.localScale = new Vector3(0.2f, 0.45f, 0.2f);
+                lg.GetComponent<Renderer>().sharedMaterial = M(row % 2 == 0 ? "M_Wood" : "M_WoodDark");
+            }
+        // ящики у штаба и у ворот
+        K("Hub_Crate", new Vector3(-11.3f, 0.08f, -10.6f), 25f, g); K("Hub_Crate", new Vector3(-10.5f, 0.08f, -10.75f), -10f, g, new Vector3(0.8f, 0.8f, 0.8f));
+        K("Hub_Crate", new Vector3(8.4f, 0f, 9.0f), 5f, g); K("Hub_Crate", new Vector3(8.5f, 0.8f, 9.0f), 30f, g, new Vector3(0.7f, 0.7f, 0.7f));
+        // указатель у точки появления
+        var sp = new Vector3(2.3f, 0, -4.6f);
+        Box("SignPost", sp + Vector3.up * 1.1f, new Vector3(0.12f, 2.2f, 0.12f), "M_WoodDark", g, true, 0.5f);
+        var signs = new (string text, float yaw, float y)[] { ("ГАРДЕРОБ", -60f, 1.95f), ("ШТАБ", 200f, 1.65f), ("НА ДЕЛО", 15f, 1.35f), ("БАСКЕТБОЛ", 120f, 1.05f) };
+        foreach (var (text, yaw, y) in signs)
+        {
+            var rot = Quaternion.Euler(0, yaw, 0);
+            var board = Box("SignBoard", sp + Vector3.up * y + rot * new Vector3(0.45f, 0, 0), new Vector3(0.95f, 0.22f, 0.05f), "M_Wood", g, false, 0f, rot);
+            Text("SignText", text, board.transform.position + rot * new Vector3(0, 0, -0.03f), rot, 1.1f, new Color(0.2f, 0.12f, 0.06f), g, new Vector2(0.9f, 0.2f));
+            Text("SignTextB", text, board.transform.position + rot * new Vector3(0, 0, 0.03f), rot * Quaternion.Euler(0, 180, 0), 1.1f, new Color(0.2f, 0.12f, 0.06f), g, new Vector2(0.9f, 0.2f));
+        }
+        // светлячки над двором (одна система частиц, аддитивные точки)
+        var ffMat = AssetDatabase.LoadAssetAtPath<Material>($"{MatDir}/M_HubF_Firefly.mat");
+        if (!ffMat) { ffMat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit")); AssetDatabase.CreateAsset(ffMat, $"{MatDir}/M_HubF_Firefly.mat"); }
+        ffMat.SetColor("_BaseColor", new Color(1f, 0.85f, 0.35f)); ffMat.SetFloat("_Surface", 1f); ffMat.SetFloat("_Blend", 2f);
+        ffMat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha); ffMat.SetFloat("_DstBlend", (float)BlendMode.One); ffMat.SetFloat("_ZWrite", 0f);
+        ffMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); ffMat.renderQueue = (int)RenderQueue.Transparent; EditorUtility.SetDirty(ffMat);
+        var ffGo = new GameObject("Fireflies", typeof(ParticleSystem)); ffGo.transform.SetParent(g, false); ffGo.transform.position = new Vector3(0, 1.6f, 0f);
+        var ps = ffGo.GetComponent<ParticleSystem>();
+        var main = ps.main; main.loop = true; main.startLifetime = new ParticleSystem.MinMaxCurve(5f, 9f); main.startSpeed = 0.15f;
+        main.startSize = new ParticleSystem.MinMaxCurve(0.035f, 0.06f); main.maxParticles = 50; main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.startColor = new Color(1f, 0.9f, 0.4f);
+        var em = ps.emission; em.rateOverTime = 7f;
+        var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(22f, 2.2f, 18f);
+        var noise = ps.noise; noise.enabled = true; noise.strength = 0.35f; noise.frequency = 0.4f;
+        var col = ps.colorOverLifetime; col.enabled = true;
+        var grad = new Gradient(); grad.SetKeys(new[] { new GradientColorKey(Color.white, 0), new GradientColorKey(Color.white, 1) },
+                                                new[] { new GradientAlphaKey(0, 0), new GradientAlphaKey(1, 0.2f), new GradientAlphaKey(1, 0.8f), new GradientAlphaKey(0, 1) });
+        col.color = grad;
+        var pr = ffGo.GetComponent<ParticleSystemRenderer>(); pr.sharedMaterial = ffMat; pr.shadowCastingMode = ShadowCastingMode.Off; pr.receiveShadows = false;
+        // трава-кочки по краям двора (без коллайдеров)
+        var plants = root.Find("Plants");
+        foreach (var p in new[] { new Vector3(-6.8f, 0, -3.6f), new Vector3(7.2f, 0, 1.2f), new Vector3(-2.4f, 0, 8.2f), new Vector3(10.8f, 0, 3.6f), new Vector3(-7.2f, 0, 5.4f), new Vector3(5.2f, 0, -10.8f), new Vector3(-13.6f, 0, -7.6f) })
+            N(new[] { "Grass_Common_Tall", "Flower_3_Group", "Bush_Common_Flowers" }[(int)Mathf.Abs(p.x) % 3], p, R(0, 360), plants ? plants : g, 0.6f);
+        log.AppendLine($"  details: {lanterns.Length} lanterns, stumps, firewood, crates, signpost, fireflies");
     }
 
     // ================================================================== коллайдеры (слой Default)
@@ -601,6 +692,8 @@ public static class HubForestBuilder
             ("Forest_4_Campfire", new Vector3(3.6f, 1.7f, -2.2f), new Vector3(0f, 0.5f, 1.6f), 62f),
             ("Forest_5_Tower", new Vector3(7.5f, 2.2f, -4.5f), new Vector3(15f, 3.8f, 3.5f), 62f),
             ("Forest_6_BusGate", new Vector3(1.0f, 1.7f, -1.5f), new Vector3(4.2f, 2.2f, 10.5f), 64f),
+            ("Forest_7_TunnelDrive", new Vector3(4.2f, 1.6f, 20.5f), new Vector3(4.2f, 1.4f, 50f), 70f),
+            ("Forest_8_Spawn", new Vector3(0.5f, 1.7f, -6.5f), new Vector3(1.5f, 1.0f, 2f), 70f),
         };
         var camGo = new GameObject("ShotCam"); var cam = camGo.AddComponent<Camera>();
         cam.clearFlags = CameraClearFlags.Skybox; cam.nearClipPlane = 0.05f; cam.farClipPlane = 400f;

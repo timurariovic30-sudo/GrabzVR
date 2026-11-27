@@ -82,6 +82,33 @@ public static class BankInventoryDump
         EditorApplication.Exit(0);
     }
 
+    /// Инвентарь HeistLevel_Test: корни, игровые компоненты (с путём, позицией, NetworkObject) → Logs/HeistInventory.txt
+    public static void HeistDump()
+    {
+        var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/Scenes/HeistLevel_Test.unity");
+        var sb = new StringBuilder();
+        string Path(Transform t) => t.parent ? Path(t.parent) + "/" + t.name : t.name;
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var rs = root.GetComponentsInChildren<Renderer>(true);
+            var b = rs.Length > 0 ? rs[0].bounds : new Bounds(root.transform.position, Vector3.zero);
+            foreach (var r in rs) b.Encapsulate(r.bounds);
+            sb.AppendLine($"ROOT {root.name}{(root.activeSelf ? "" : " (off)")} children {root.transform.childCount} r{rs.Length} bounds {b.min}..{b.max}");
+            foreach (Transform c in root.transform) sb.AppendLine($"   {c.name}{(c.gameObject.activeSelf ? "" : " (off)")} @({c.position.x:F1},{c.position.y:F1},{c.position.z:F1}) r{c.GetComponentsInChildren<Renderer>(true).Length}");
+        }
+        sb.AppendLine("--- functional components");
+        var skip = new System.Collections.Generic.HashSet<string> { "TextMeshPro", "TMP_SubMesh", "UniversalAdditionalCameraData", "UniversalAdditionalLightData" };
+        foreach (var mb in Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include).Where(m => m && !skip.Contains(m.GetType().Name)))
+        {
+            var path = Path(mb.transform);
+            if (path.Contains("GorillaAvatar") || path.Contains("Armature")) continue;
+            var p = mb.transform.position;
+            sb.AppendLine($"{mb.GetType().Name} : {path}{(mb.gameObject.activeInHierarchy ? "" : " (inactive)")} @({p.x:F2},{p.y:F2},{p.z:F2}) rotY {mb.transform.eulerAngles.y:F0}");
+        }
+        System.IO.File.WriteAllText("Logs/HeistInventory.txt", sb.ToString());
+        EditorApplication.Exit(0);
+    }
+
     public static void KitNormals()
     {
         var sb = new StringBuilder();
