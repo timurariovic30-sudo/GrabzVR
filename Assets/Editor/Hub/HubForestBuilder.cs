@@ -127,6 +127,7 @@ public static class HubForestBuilder
         Mat("M_HubF_MapInk", new Color(0.2f, 0.32f, 0.55f));
         Mat("M_HubF_Red", new Color(0.8f, 0.15f, 0.12f));
         Mat("M_HubF_Line", new Color(0.95f, 0.92f, 0.8f));
+        Mat("M_HubF_Portal", new Color(0.35f, 0.75f, 1f), null, 1f, new Color(0.6f, 1.8f, 3f));
         mats["M_Wood"] = AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Materials/Hub/M_Hub_Wood.mat");
         mats["M_WoodDark"] = AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Materials/Hub/M_Hub_WoodDark.mat");
         mats["M_Brick"] = AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Materials/Hub/M_Hub_Brick.mat");
@@ -603,6 +604,20 @@ public static class HubForestBuilder
             Text("SignText", text, board.transform.position + rot * new Vector3(0, 0, -0.03f), rot, 1.1f, new Color(0.2f, 0.12f, 0.06f), g, new Vector2(0.9f, 0.2f));
             Text("SignTextB", text, board.transform.position + rot * new Vector3(0, 0, 0.03f), rot * Quaternion.Euler(0, 180, 0), 1.1f, new Color(0.2f, 0.12f, 0.06f), g, new Vector2(0.9f, 0.2f));
         }
+        // портал на тестовый полигон TestGym (у баскетбольной площадки, лицом во двор)
+        {
+            var pc = new Vector3(9.4f, 0f, 1.6f);
+            var portal = new GameObject("GymPortal").transform; portal.SetParent(g, false);
+            Box("PostN", pc + new Vector3(0, 1.5f, 1.3f), new Vector3(0.35f, 3f, 0.35f), "M_WoodDark", portal, true, 0.5f);
+            Box("PostS", pc + new Vector3(0, 1.5f, -1.3f), new Vector3(0.35f, 3f, 0.35f), "M_WoodDark", portal, true, 0.5f);
+            Box("Beam", pc + new Vector3(0, 3.15f, 0), new Vector3(0.4f, 0.3f, 3f), "M_WoodDark", portal, true, 0.5f);
+            var glow = Box("Glow", pc + new Vector3(0.05f, 1.45f, 0), new Vector3(0.04f, 2.8f, 2.2f), "M_HubF_Portal", portal, false, 0f);
+            glow.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+            var trig = new GameObject("Trigger", typeof(BoxCollider)); trig.transform.SetParent(portal, false); trig.transform.position = pc + new Vector3(0.1f, 1.4f, 0);
+            var bc = trig.GetComponent<BoxCollider>(); bc.isTrigger = true; bc.size = new Vector3(0.8f, 2.8f, 2.2f); trig.layer = LayerMask.NameToLayer("Ignore Raycast");
+            trig.AddComponent<ScenePortal>().sceneName = "TestGym";
+            Text("GymPortalTitle", "ПОЛИГОН", pc + new Vector3(-0.22f, 3.15f, 0), Quaternion.Euler(0, 90, 0), 2.2f, new Color(0.55f, 0.85f, 1f), portal, new Vector2(3, 0.4f));
+        }
         // светлячки над двором (одна система частиц, аддитивные точки)
         var ffMat = AssetDatabase.LoadAssetAtPath<Material>($"{MatDir}/M_HubF_Firefly.mat");
         if (!ffMat) { ffMat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit")); AssetDatabase.CreateAsset(ffMat, $"{MatDir}/M_HubF_Firefly.mat"); }
@@ -694,6 +709,7 @@ public static class HubForestBuilder
             ("Forest_6_BusGate", new Vector3(1.0f, 1.7f, -1.5f), new Vector3(4.2f, 2.2f, 10.5f), 64f),
             ("Forest_7_TunnelDrive", new Vector3(4.2f, 1.6f, 20.5f), new Vector3(4.2f, 1.4f, 50f), 70f),
             ("Forest_8_Spawn", new Vector3(0.5f, 1.7f, -6.5f), new Vector3(1.5f, 1.0f, 2f), 70f),
+            ("Forest_9_GymPortal", new Vector3(4.5f, 1.7f, 0.2f), new Vector3(9.4f, 1.6f, 1.6f), 70f),
         };
         var camGo = new GameObject("ShotCam"); var cam = camGo.AddComponent<Camera>();
         cam.clearFlags = CameraClearFlags.Skybox; cam.nearClipPlane = 0.05f; cam.farClipPlane = 400f;

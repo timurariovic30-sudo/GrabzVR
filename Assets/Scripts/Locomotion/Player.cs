@@ -57,6 +57,46 @@ namespace GorillaLocomotion
         // [local] сила отскока поверхности, которой касаются руки (батуты), 1 = обычная
         private float touchBounce = 1f;
 
+        // [local] гравитация только для игрока (лут и мир не трогаем): 1 = Physics.gravity
+        [Tooltip("[local] Множитель гравитации игрока (1 = обычная). Подкручивается на стенде TestGym")]
+        public float gravityScale = 1f;
+        // [local] инерция гасится только когда тело стоит на земле и руки ничего не касаются; в воздухе — без сопротивления
+        [Tooltip("[local] Затухание горизонтальной скорости на земле, 1/с (0 = скользит, 8 = быстро останавливается)")]
+        public float groundDamping = 8f;
+        [Tooltip("[local] Насколько ниже капсулы тела ищем землю")]
+        public float groundCheckDistance = 0.08f;
+        [Tooltip("[local] Брать сохранённые на стенде TestGym значения (PlayerPrefs) при старте")]
+        public bool applySavedTuning = true;
+        public bool IsGrounded { get; private set; }
+
+
+        // [local] дополнительная гравитация и затухание на земле
+        private void FixedUpdate()
+        {
+            if (playerRigidBody == null || bodyCollider == null) return;
+            IsGrounded = CheckGrounded();
+            if (disableMovement || playerRigidBody.isKinematic) return;
+            if (playerRigidBody.useGravity && !Mathf.Approximately(gravityScale, 1f))
+                playerRigidBody.AddForce(Physics.gravity * (gravityScale - 1f), ForceMode.Acceleration);
+            if (IsGrounded && groundDamping > 0f && !wasLeftHandTouching && !wasRightHandTouching)
+            {
+                var v = playerRigidBody.linearVelocity;
+                if (v.y < 0.5f)
+                {
+                    float k = Mathf.Exp(-groundDamping * Time.fixedDeltaTime);
+                    playerRigidBody.linearVelocity = new Vector3(v.x * k, v.y, v.z * k);
+                }
+            }
+        }
+
+        private bool CheckGrounded()
+        {
+            var b = bodyCollider.bounds;
+            float r = Mathf.Max(0.05f, Mathf.Min(b.extents.x, b.extents.z) * 0.9f);
+            var origin = new Vector3(b.center.x, b.min.y + r + 0.02f, b.center.z);
+            return Physics.SphereCast(origin, r, Vector3.down, out _, groundCheckDistance + 0.02f, locomotionEnabledLayers.value, QueryTriggerInteraction.Ignore);
+        }
+
         private void Awake()
         {
             if (_instance != null && _instance != this)
@@ -68,6 +108,8 @@ namespace GorillaLocomotion
                 _instance = this;
             }
             InitializeValues();
+            // [local] сохранённые на стенде TestGym значения — до Awake GorillaHeavySlowdown (он запомнит их как базу)
+            if (applySavedTuning) LocomotionTuning.ApplySaved(this);
         }
 
         public void InitializeValues()

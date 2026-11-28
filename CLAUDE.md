@@ -11,6 +11,7 @@
 | 0 | `Assets/Scenes/MainHub.unity` | Главный хаб: зеркало, выбор цвета шерсти (`SkinButton`), стол режимов, фургон-портал (`VanPortal`), ретро-компьютер GRABZ OS (`GrabzComputer`), баскетбол |
 | 1 | `Assets/Scenes/HeistLevel_Test.unity` | Банк SUNSET TRUST (Майами): закатная улица с фургоном грабителей, операционный зал с кассами, служебное крыло (комната отдыха, серверная, кабинет директора), подвал с главным хранилищем, галерея, офисы, гараж с броневиком (зона сдачи лута) |
 | — | `Assets/Scenes/SampleScene.unity` | **Не трогать.** В Build Settings выключена |
+| 3 | `Assets/Scenes/TestGym.unity` | Тестовый полигон: полоса препятствий, стенд физики (± прыжок/скорость/гравитация, сохранение в PlayerPrefs), дрель + сейф, щиток с 3 рубильниками, лазеры, охранник с шокером, лут разного веса, зеркало, портал в хаб. Вход — портал «ПОЛИГОН» в хабе. **Сцена целиком генерируется** `Tools/Heist/Gym/Build Test Gym` (`TestGymBuilder`, из копии MainHub): ручные правки в ней пропадут при пересборке. Проверка — `GymPlayModeCheck` |
 
 `GameSession.HubScene` / `GameSession.HeistScene` задают имена сцен. Сцены в Build Settings ищутся по имени (`FusionNetworkManager.LoadSceneSynced`).
 

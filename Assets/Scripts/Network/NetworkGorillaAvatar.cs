@@ -81,12 +81,32 @@ public class NetworkGorillaAvatar : NetworkBehaviour
             if (rig) rig.enabled = false;
             Runner.MakeDontDestroyOnLoad(gameObject);
         }
-        else if (rig)
+        else
         {
-            rig.head = headProxy;
-            rig.left.target = leftProxy; rig.left.rotationSource = leftProxy;
-            rig.right.target = rightProxy; rig.right.rotationSource = rightProxy;
+            // чужая горилла: голова, глаза, рот, балаклава и шапки — на Default, чтобы их видела наша камера
+            // (LocalHead скрыт из culling mask камеры и нужен только СВОЕЙ голове у локального игрока VRGorillaPlayer)
+            int moved = MakeHeadVisible(gameObject);
+            if (moved > 0) Debug.Log($"[NetworkGorillaAvatar] голова чужого игрока видима: {moved} объектов LocalHead → Default");
+            if (rig)
+            {
+                rig.head = headProxy;
+                rig.left.target = leftProxy; rig.left.rotationSource = leftProxy;
+                rig.right.target = rightProxy; rig.right.rotationSource = rightProxy;
+            }
         }
+    }
+
+    /// Переводит все объекты слоя LocalHead внутри root (включая выключенную косметику) на слой Default.
+    /// Возвращает число перенесённых объектов. Вызывается только для удалённых игроков (!HasStateAuthority:
+    /// в Shared Mode владелец аватара — его StateAuthority, InputAuthority не используется).
+    public static int MakeHeadVisible(GameObject root)
+    {
+        int localHead = LayerMask.NameToLayer("LocalHead");
+        if (localHead < 0 || root == null) return 0;
+        int n = 0;
+        foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            if (t.gameObject.layer == localHead) { t.gameObject.layer = 0; n++; }
+        return n;
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)

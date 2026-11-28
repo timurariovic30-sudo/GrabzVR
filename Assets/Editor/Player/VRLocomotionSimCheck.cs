@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEditor;
@@ -112,7 +112,7 @@ public static class VRLocomotionSimCheck
         for (int stroke = 0; stroke < 4; stroke++)
         {
             Vector3 c = Body();
-            Vector3 l0 = new Vector3(c.x, 0.07f, c.z) + fwd * 0.3f - right * 0.3f, r0 = l0 + right * 0.6f;
+            Vector3 l0 = new Vector3(c.x, gp.minimumRaycastDistance + 0.02f, c.z) + fwd * 0.3f - right * 0.3f, r0 = l0 + right * 0.6f;
             Hands(l0 + Vector3.up * 0.25f, r0 + Vector3.up * 0.25f); for (int i = 0; i < 3; i++) yield return 0f;   // занести руки
             Hands(l0, r0); for (int i = 0; i < 2; i++) yield return 0f;                                             // коснуться пола
             for (int i = 1; i <= 10; i++) { Vector3 d = -fwd * 0.045f * i + Vector3.down * 0.03f; Hands(l0 + d, r0 + d); yield return 0f; }
@@ -129,8 +129,8 @@ public static class VRLocomotionSimCheck
             rb.linearVelocity = Vector3.zero;                                              // после ходьбы тело ещё скользит
             Hands(Body() + Vector3.up * 0.3f - right * 0.3f, Body() + Vector3.up * 0.3f + right * 0.3f);
             for (int i = 0; i < 40; i++) { rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0); yield return 0f; }
-            Vector3 c = Body(); Vector3 l0 = new Vector3(c.x, 0.07f, c.z) + fwd * 0.25f - right * 0.3f, r0 = l0 + right * 0.6f;
-            Hands(l0, r0);                                                                  // руки над полом (сфера руки 5 см)
+            Vector3 c = Body(); Vector3 l0 = new Vector3(c.x, gp.minimumRaycastDistance + 0.02f, c.z) + fwd * 0.25f - right * 0.3f, r0 = l0 + right * 0.6f;
+            Hands(l0, r0);                                                                  // руки над полом (на радиус сферы руки + 2 см)
             for (int i = 0; i < 12; i++) yield return 0f;
             float y0 = Body().y, maxY = y0, maxV = 0;
             Vector3 d = Vector3.zero;
